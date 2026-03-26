@@ -1,5 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { browser } from '$app/environment';
+  import { auth } from '$lib/auth';
 
   interface Token {
     id: number;
@@ -13,18 +16,34 @@
   let loading = true;
   let error: string | null = null;
 
-  // Form state
   let name = '';
   let symbol = '';
   let supply = 0;
 
   onMount(async () => {
+    if (browser) {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        goto('/login');
+        return;
+      }
+    }
     await fetchTokens();
   });
 
   async function fetchTokens() {
     try {
-      const response = await fetch('/api/tokens');
+      const token = browser ? localStorage.getItem('token') : null;
+      const response = await fetch('/api/tokens', {
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+      if (response.status === 401) {
+        auth.logout();
+        goto('/login');
+        return;
+      }
       if (!response.ok) throw new Error('Failed to fetch tokens');
       tokens = await response.json();
     } catch (err) {
@@ -36,18 +55,26 @@
 
   async function createToken() {
     try {
+      const token = browser ? localStorage.getItem('token') : null;
       const response = await fetch('/api/tokens', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ name, symbol, supply })
       });
       
+      if (response.status === 401) {
+        auth.logout();
+        goto('/login');
+        return;
+      }
       if (!response.ok) throw new Error('Failed to create token');
       
       const newToken = await response.json();
       tokens = [newToken, ...tokens];
       
-      // Reset form
       name = '';
       symbol = '';
       supply = 0;
@@ -57,201 +84,97 @@
   }
 </script>
 
-<main>
-  <h1>🌲 TokenForest</h1>
-  <p class="subtitle">Manage your tokens in the forest</p>
+<div class="p-4 max-w-6xl mx-auto">
+  <div class="mb-6">
+    <h1 class="text-3xl font-bold">🌲 TokenForest</h1>
+    <p class="text-base-content/70">Manage your tokens in the forest</p>
+  </div>
 
-  <section class="create-token">
-    <h2>Create New Token</h2>
-    <form on:submit|preventDefault={createToken}>
-      <div class="form-group">
-        <label for="name">Token Name</label>
-        <input 
-          type="text" 
-          id="name" 
-          bind:value={name} 
-          placeholder="e.g., Forest Coin"
-          required
-        />
-      </div>
+  <div class="card bg-base-100 shadow-xl mb-6">
+    <div class="card-body">
+      <h2 class="card-title">Create New Token</h2>
+      <form on:submit|preventDefault={createToken} class="flex flex-col md:flex-row gap-4">
+        <div class="form-control flex-1">
+          <label class="label" for="name">
+            <span class="label-text">Token Name</span>
+          </label>
+          <input 
+            type="text" 
+            id="name" 
+            class="input input-bordered w-full"
+            bind:value={name} 
+            placeholder="e.g., Forest Coin"
+            required
+          />
+        </div>
+        
+        <div class="form-control flex-1">
+          <label class="label" for="symbol">
+            <span class="label-text">Symbol</span>
+          </label>
+          <input 
+            type="text" 
+            id="symbol" 
+            class="input input-bordered w-full"
+            bind:value={symbol} 
+            placeholder="e.g., FST"
+            required
+          />
+        </div>
+        
+        <div class="form-control flex-1">
+          <label class="label" for="supply">
+            <span class="label-text">Supply</span>
+          </label>
+          <input 
+            type="number" 
+            id="supply" 
+            class="input input-bordered w-full"
+            bind:value={supply} 
+            placeholder="1000000"
+            required
+          />
+        </div>
+        
+        <div class="form-control md:self-end">
+          <button type="submit" class="btn btn-primary" disabled={loading}>
+            Create Token 🌱
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+      <h2 class="card-title">All Tokens ({tokens.length})</h2>
       
-      <div class="form-group">
-        <label for="symbol">Symbol</label>
-        <input 
-          type="text" 
-          id="symbol" 
-          bind:value={symbol} 
-          placeholder="e.g., FST"
-          required
-        />
-      </div>
-      
-      <div class="form-group">
-        <label for="supply">Supply</label>
-        <input 
-          type="number" 
-          id="supply" 
-          bind:value={supply} 
-          placeholder="1000000"
-          required
-        />
-      </div>
-      
-      <button type="submit" disabled={loading}>Create Token 🌱</button>
-    </form>
-  </section>
-
-  <section class="token-list">
-    <h2>All Tokens ({tokens.length})</h2>
-    
-    {#if loading}
-      <p class="loading">Loading tokens...</p>
-    {:else if error}
-      <p class="error">Error: {error}</p>
-    {:else if tokens.length === 0}
-      <p class="empty">No tokens yet. Create the first one! 🌱</p>
-    {:else}
-      <div class="tokens-grid">
-        {#each tokens as token (token.id)}
-          <div class="token-card">
-            <h3>{token.name}</h3>
-            <span class="symbol">{token.symbol}</span>
-            <p class="supply">Supply: {token.supply.toLocaleString()}</p>
-            <p class="created">Created: {new Date(token.created_at).toLocaleDateString()}</p>
-          </div>
-        {/each}
-      </div>
-    {/if}
-  </section>
-</main>
-
-<style>
-  :global(body) {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    min-height: 100vh;
-  }
-
-  main {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2rem;
-    color: white;
-  }
-
-  h1 {
-    font-size: 3rem;
-    margin-bottom: 0.5rem;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-  }
-
-  .subtitle {
-    font-size: 1.2rem;
-    opacity: 0.9;
-    margin-bottom: 2rem;
-  }
-
-  section {
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    border-radius: 16px;
-    padding: 2rem;
-    margin-bottom: 2rem;
-  }
-
-  h2 {
-    margin-top: 0;
-    border-bottom: 2px solid rgba(255,255,255,0.3);
-    padding-bottom: 0.5rem;
-  }
-
-  .form-group {
-    margin-bottom: 1rem;
-  }
-
-  label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 600;
-  }
-
-  input {
-    width: 100%;
-    padding: 0.75rem;
-    border: none;
-    border-radius: 8px;
-    font-size: 1rem;
-    box-sizing: border-box;
-  }
-
-  button {
-    background: #4CAF50;
-    color: white;
-    border: none;
-    padding: 1rem 2rem;
-    font-size: 1rem;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: transform 0.2s, background 0.2s;
-  }
-
-  button:hover:not(:disabled) {
-    background: #45a049;
-    transform: translateY(-2px);
-  }
-
-  button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  .tokens-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 1.5rem;
-  }
-
-  .token-card {
-    background: rgba(255, 255, 255, 0.15);
-    padding: 1.5rem;
-    border-radius: 12px;
-    transition: transform 0.2s;
-  }
-
-  .token-card:hover {
-    transform: translateY(-4px);
-    background: rgba(255, 255, 255, 0.2);
-  }
-
-  .token-card h3 {
-    margin: 0 0 0.5rem 0;
-    font-size: 1.5rem;
-  }
-
-  .symbol {
-    display: inline-block;
-    background: rgba(255, 255, 255, 0.2);
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
-    font-weight: bold;
-    margin-bottom: 1rem;
-  }
-
-  .supply, .created {
-    margin: 0.5rem 0;
-    opacity: 0.9;
-  }
-
-  .loading, .error, .empty {
-    text-align: center;
-    padding: 2rem;
-    font-size: 1.2rem;
-  }
-
-  .error {
-    color: #ff6b6b;
-    background: rgba(255, 107, 107, 0.2);
-    border-radius: 8px;
-  }
-</style>
+      {#if loading}
+        <div class="text-center py-8">
+          <span class="loading loading-spinner loading-lg"></span>
+        </div>
+      {:else if error}
+        <div class="alert alert-error">
+          <span>Error: {error}</span>
+        </div>
+      {:else if tokens.length === 0}
+        <div class="text-center py-8 text-base-content/70">
+          No tokens yet. Create the first one! 🌱
+        </div>
+      {:else}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {#each tokens as token (token.id)}
+            <div class="card bg-base-200">
+              <div class="card-body">
+                <h3 class="card-title">{token.name}</h3>
+                <div class="badge badge-outline">{token.symbol}</div>
+                <p class="text-sm text-base-content/70">Supply: {token.supply.toLocaleString()}</p>
+                <p class="text-sm text-base-content/70">Created: {new Date(token.created_at).toLocaleDateString()}</p>
+              </div>
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  </div>
+</div>
