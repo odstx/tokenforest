@@ -61,23 +61,46 @@ tokenforest/
 
 ## 🚀 快速开始
 
-### 启动后端
+### 一键启动（推荐）
+
 ```bash
-cd tokenforest/backend
-cargo build
-cargo run
+# 安装依赖并启动开发服务器
+make dev
 ```
 
-### 启动前端（使用 Bun）
+这将同时启动：
+- 🦀 **后端**: http://localhost:3000
+- ⚡ **前端**: http://localhost:5173
+
+### 分步启动
+
 ```bash
-cd tokenforest/frontend
-bun install
-bun run dev
+# 安装后端依赖并编译
+make install-backend
+
+# 安装前端依赖
+make install-frontend
+
+# 单独启动后端
+make dev-backend
+
+# 单独启动前端
+make dev-frontend
 ```
 
-### 访问应用
-- 前端：http://localhost:5173
-- 后端 API: http://localhost:3000
+### 其他命令
+
+```bash
+# 查看所有可用命令
+make help
+
+# 构建生产版本
+make build-backend
+make build-frontend
+
+# 清理构建文件
+make clean
+```
 
 ## 📝 待办事项
 

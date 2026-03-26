@@ -1,122 +1,78 @@
-# TokenForest 🌲
+# TokenForest 🌲🪙
 
-A modern web application for managing tokens, built with Rust, Svelte, and SQLite.
+A modern full-stack token management application built with Rust and Svelte.
+
+## Features
+
+- 🦀 **Rust Backend** - High-performance API with Axum + SQLx
+- ⚡ **Svelte Frontend** - Reactive UI with Bun runtime
+- 💾 **SQLite Database** - Zero-configuration data storage
+- 🎨 **Modern Design** - Glassmorphism UI with responsive layout
+- 🚀 **One-Command Start** - `make dev` runs everything
+
+## Quick Start
+
+```bash
+# One-command development setup
+make dev
+
+# Or see all available commands
+make help
+```
+
+## Tech Stack
+
+**Backend**
+- Rust + Axum (web framework)
+- SQLx + SQLite (database)
+- Tokio (async runtime)
+- Serde (serialization)
+
+**Frontend**
+- SvelteKit + Vite
+- Bun runtime (10x faster than npm!)
+- TypeScript
+- Glassmorphism CSS
 
 ## Project Structure
 
 ```
 tokenforest/
-├── backend/          # Rust backend (Axum + SQLx)
+├── backend/          # Rust API server
 │   ├── src/
-│   │   ├── main.rs   # Application entry point
-│   │   ├── handlers.rs  # API route handlers
-│   │   ├── models.rs    # Data models
-│   │   └── db.rs        # Database migrations
-│   ├── Cargo.toml
-│   └── README.md
-├── frontend/         # SvelteKit frontend
+│   │   ├── main.rs
+│   │   ├── handlers.rs
+│   │   └── db.rs
+│   └── Cargo.toml
+├── frontend/         # Svelte web app
 │   ├── src/
 │   │   └── routes/
-│   │       └── +page.svelte  # Main page
 │   ├── package.json
-│   └── README.md
-├── database/         # Database schemas and scripts
-│   └── schema.sql
-└── docs/            # Documentation
+│   └── bun.lockb
+├── database/         # SQL schemas
+├── docs/            # Documentation
+├── Makefile         # Build commands
+└── README.md
 ```
 
-## Tech Stack
+## Available Commands
 
-### Backend
-- **Language**: Rust 🦀
-- **Web Framework**: Axum
-- **Database**: SQLite with SQLx
-- **Async Runtime**: Tokio
-
-### Frontend
-- **Framework**: SvelteKit
-- **Build Tool**: Vite
-- **Language**: TypeScript
-- **Styling**: Custom CSS with glassmorphism
-
-## Quick Start
-
-### Prerequisites
-- Rust (1.70+)
-- Node.js (18+)
-- npm or pnpm
-
-### Backend Setup
-
-```bash
-cd backend
-
-# Build and run
-cargo build
-cargo run
-
-# Or with auto-reload
-cargo watch -x run
-```
-
-The backend will start on `http://localhost:3000`
-
-### Frontend Setup
-
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Run development server
-npm run dev
-```
-
-The frontend will start on `http://localhost:5173`
-
-## API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/` | Welcome message |
-| GET | `/api/tokens` | List all tokens |
-| POST | `/api/tokens` | Create a new token |
-
-## Environment Variables
-
-Create a `.env` file in the backend directory:
-
-```env
-DATABASE_URL=./database/tokenforest.db
-RUST_LOG=debug
-```
-
-## Development
-
-### Running Tests
-
-```bash
-# Backend tests
-cd backend && cargo test
-
-# Frontend tests
-cd frontend && npm test
-```
-
-### Database Migrations
-
-Migrations are automatically run when the backend starts.
-Manual migration:
-
-```bash
-sqlite3 database/tokenforest.db < database/schema.sql
-```
+| Command | Description |
+|---------|-------------|
+| `make dev` | Start both backend & frontend |
+| `make dev-backend` | Start backend only |
+| `make dev-frontend` | Start frontend only |
+| `make install-backend` | Build backend |
+| `make install-frontend` | Install frontend deps |
+| `make build-backend` | Release build (backend) |
+| `make build-frontend` | Production build (frontend) |
+| `make clean` | Remove build artifacts |
+| `make help` | Show all commands |
 
 ## License
 
-MIT
+GPL-3.0 - See [LICENSE](LICENSE) for details.
 
 ---
 
-Built with ❤️ using Rust and Svelte
+Built with ❤️ using Rust, Svelte, and Bun
