@@ -6,45 +6,63 @@ use axum::{
 use bcrypt::{hash, verify, DEFAULT_COST};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
+use utoipa::ToSchema;
 
-use crate::auth::{create_jwt_token, CurrentUser};
-use crate::models::{Token, User};
+use crate::auth::create_jwt_token;
+use crate::models::User;
 
 pub type AppPool = SqlitePool;
 
+#[utoipa::path(
+    get,
+    path = "/",
+    responses(
+        (status = 200, description = "Welcome message", body = str)
+    )
+)]
 pub async fn index() -> &'static str {
     "Welcome to TokenForest API"
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct RegisterRequest {
     pub username: String,
     pub password: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct LoginRequest {
     pub username: String,
     pub password: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct AuthResponse {
     pub token: String,
     pub user: UserInfo,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct UserInfo {
     pub id: i64,
     pub username: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct ErrorResponse {
     pub error: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/auth/register",
+    request_body = RegisterRequest,
+    responses(
+        (status = 200, description = "User registered successfully", body = AuthResponse),
+        (status = 400, description = "Invalid input", body = ErrorResponse),
+        (status = 409, description = "Username already exists", body = ErrorResponse)
+    )
+)]
 pub async fn register(
     State(pool): State<AppPool>,
     Json(payload): Json<RegisterRequest>,
@@ -131,6 +149,15 @@ pub async fn register(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/auth/login",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "Login successful", body = AuthResponse),
+        (status = 401, description = "Invalid credentials", body = ErrorResponse)
+    )
+)]
 pub async fn login(
     State(pool): State<AppPool>,
     Json(payload): Json<LoginRequest>,
@@ -189,41 +216,4 @@ pub async fn login(
             username: user.username,
         },
     }))
-}
-
-pub async fn list_tokens(
-    State(pool): State<AppPool>,
-    _user: CurrentUser,
-) -> Result<Json<Vec<Token>>, StatusCode> {
-    let tokens = sqlx::query_as::<_, Token>("SELECT * FROM tokens ORDER BY created_at DESC")
-        .fetch_all(&pool)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    Ok(Json(tokens))
-}
-
-pub async fn create_token(
-    State(pool): State<AppPool>,
-    _user: CurrentUser,
-    Json(payload): Json<CreateTokenRequest>,
-) -> Result<Json<Token>, StatusCode> {
-    let token = sqlx::query_as::<_, Token>(
-        "INSERT INTO tokens (name, symbol, supply, created_at) VALUES (?, ?, ?, datetime('now')) RETURNING *"
-    )
-    .bind(&payload.name)
-    .bind(&payload.symbol)
-    .bind(&payload.supply)
-    .fetch_one(&pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    Ok(Json(token))
-}
-
-#[derive(Deserialize)]
-pub struct CreateTokenRequest {
-    pub name: String,
-    pub symbol: String,
-    pub supply: i64,
 }

@@ -5,11 +5,36 @@ use axum::{
 use sqlx::sqlite::SqlitePool;
 use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 mod auth;
 mod handlers;
 mod models;
 mod db;
+
+#[derive(OpenApi)]
+#[openapi(
+    paths(
+        handlers::index,
+        handlers::register,
+        handlers::login
+    ),
+    components(
+        schemas(
+            models::User,
+            handlers::RegisterRequest,
+            handlers::LoginRequest,
+            handlers::AuthResponse,
+            handlers::UserInfo,
+            handlers::ErrorResponse
+        )
+    ),
+    tags(
+        (name = "auth", description = "Authentication endpoints")
+    )
+)]
+struct ApiDoc;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -31,16 +56,11 @@ async fn main() -> anyhow::Result<()> {
 
     db::migrate(&pool).await?;
 
-    let token_routes = Router::new()
-        .route("/", get(handlers::list_tokens))
-        .route("/", post(handlers::create_token))
-        .route_layer(axum::middleware::from_fn(auth::auth_middleware));
-
     let app = Router::new()
         .route("/", get(handlers::index))
         .route("/api/auth/register", post(handlers::register))
         .route("/api/auth/login", post(handlers::login))
-        .nest("/api/tokens", token_routes)
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .with_state(pool);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
