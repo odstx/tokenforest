@@ -3,6 +3,7 @@
 SvelteKit frontend for TokenForest application.
 
 ## Tech Stack
+- **Runtime**: Bun 🚀
 - **Framework**: SvelteKit
 - **Build Tool**: Vite
 - **Language**: TypeScript
@@ -11,17 +12,17 @@ SvelteKit frontend for TokenForest application.
 ## Setup
 
 ```bash
-# Install dependencies
-npm install
+# Install dependencies with Bun
+bun install
 
 # Run development server
-npm run dev
+bun run dev
 
 # Build for production
-npm run build
+bun run build
 
 # Preview production build
-npm run preview
+bun run preview
 ```
 
 ## Configuration
