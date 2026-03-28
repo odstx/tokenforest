@@ -6,6 +6,7 @@ use axum::{
 use sqlx::sqlite::SqlitePool;
 use std::net::SocketAddr;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::services::ServeDir;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -21,7 +22,6 @@ mod crypto;
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        handlers::index,
         handlers::register,
         handlers::login,
         handlers::list_api_keys,
@@ -101,12 +101,15 @@ async fn main() -> anyhow::Result<()> {
         .allow_methods(Any)
         .allow_headers(Any);
 
+    let frontend_dir = std::env::var("FRONTEND_DIR")
+        .unwrap_or_else(|_| "../frontend/build".to_string());
+    
     let app = Router::new()
-        .route("/", get(handlers::index))
         .route("/api/auth/register", post(handlers::register))
         .route("/api/auth/login", post(handlers::login))
         .merge(protected_routes)
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        .fallback_service(ServeDir::new(&frontend_dir).fallback(ServeDir::new(format!("{}/index.html", frontend_dir))))
         .layer(cors)
         .with_state(pool);
 

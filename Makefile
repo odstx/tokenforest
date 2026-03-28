@@ -1,7 +1,7 @@
 # TokenForest Makefile
 # Quick commands for development and deployment
 
-.PHONY: help dev dev-backend dev-core dev-frontend build-backend build-frontend clean install-backend install-frontend test test-backend test-frontend test-ui kill-all
+.PHONY: help dev dev-backend dev-core dev-frontend build build-backend build-frontend clean install-backend install-frontend test test-backend test-frontend test-ui kill-all
 
 CARGO := $(HOME)/.cargo/bin/cargo
 
@@ -103,6 +103,10 @@ build-backend:
 build-frontend:
 	@echo "⚡ Building frontend for production..."
 	cd frontend && bun run build
+
+# Build everything for production
+build: build-frontend build-backend
+	@echo "✅ Build complete!"
 
 # Clean build artifacts
 clean:

@@ -14,17 +14,6 @@ use crate::models::{ApiKey, ApiKeyResponse, CreateApiKeyRequest, CreateApiKeyRes
 
 pub type AppPool = SqlitePool;
 
-#[utoipa::path(
-    get,
-    path = "/",
-    responses(
-        (status = 200, description = "Welcome message", body = str)
-    )
-)]
-pub async fn index() -> &'static str {
-    "Welcome to TokenForest API"
-}
-
 #[derive(Deserialize, ToSchema)]
 pub struct RegisterRequest {
     pub username: String,
