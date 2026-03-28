@@ -11,6 +11,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 mod auth;
+mod core;
 mod handlers;
 mod models;
 mod db;

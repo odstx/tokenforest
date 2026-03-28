@@ -52,3 +52,42 @@ pub fn decrypt(encrypted: &str) -> Result<String, String> {
     
     String::from_utf8(plaintext).map_err(|e| e.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_encrypt_decrypt_roundtrip() {
+        let original = "my-secret-api-key-12345";
+        let encrypted = encrypt(original).expect("Encryption should succeed");
+        assert_ne!(encrypted, original, "Encrypted value should differ from original");
+        
+        let decrypted = decrypt(&encrypted).expect("Decryption should succeed");
+        assert_eq!(decrypted, original, "Decrypted value should match original");
+    }
+
+    #[test]
+    fn test_encrypt_produces_different_ciphertext() {
+        let original = "same-input";
+        let encrypted1 = encrypt(original).expect("Encryption should succeed");
+        let encrypted2 = encrypt(original).expect("Encryption should succeed");
+        
+        assert_ne!(encrypted1, encrypted2, "Each encryption should produce different ciphertext due to random nonce");
+        
+        assert_eq!(decrypt(&encrypted1).unwrap(), decrypt(&encrypted2).unwrap());
+    }
+
+    #[test]
+    fn test_decrypt_invalid_base64() {
+        let result = decrypt("not-valid-base64!!!");
+        assert!(result.is_err(), "Should fail on invalid base64");
+    }
+
+    #[test]
+    fn test_decrypt_too_short() {
+        let short_input = BASE64.encode(&[0u8; 5]);
+        let result = decrypt(&short_input);
+        assert!(result.is_err(), "Should fail on data too short to contain nonce");
+    }
+}

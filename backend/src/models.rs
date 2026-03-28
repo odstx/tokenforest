@@ -10,7 +10,7 @@ pub struct User {
     pub created_at: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, FromRow, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct ApiKey {
     pub id: i64,
     pub user_id: i64,
