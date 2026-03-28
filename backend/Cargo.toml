@@ -3,6 +3,7 @@ name = "tokenforest_backend"
 version = "0.1.0"
 edition = "2021"
 description = "TokenForest backend - A tokenhub web project"
+default-run = "tokenforest_backend"
 
 [lib]
 name = "tokenforest_backend"

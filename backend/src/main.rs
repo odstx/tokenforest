@@ -77,7 +77,7 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "sqlite:./database/tokenforest.db?mode=rwc".to_string());
+        .unwrap_or_else(|_| "sqlite:/opt/tf/database/tokenforest.db?mode=rwc".to_string());
     
     let pool = SqlitePool::connect(&database_url).await?;
     tracing::info!("Connected to SQLite database");

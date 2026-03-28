@@ -1,9 +1,19 @@
 # TokenForest Makefile
 # Quick commands for development and deployment
 
-.PHONY: help dev dev-backend dev-core dev-frontend build-backend build-frontend clean install-backend install-frontend test test-backend test-frontend test-ui
+.PHONY: help dev dev-backend dev-core dev-frontend build-backend build-frontend clean install-backend install-frontend test test-backend test-frontend test-ui kill-all
 
 CARGO := $(HOME)/.cargo/bin/cargo
+
+# Kill process on a specific port
+kill-port = @lsof -ti:$(1) | xargs kill -9 2>/dev/null || true
+
+# Kill all development servers
+kill-all:
+	@echo "🔪 Killing processes on ports 3000, 8000, 5173..."
+	$(call kill-port,3000)
+	$(call kill-port,8000)
+	$(call kill-port,5173)
 
 # Default target
 help:
@@ -22,11 +32,16 @@ help:
 	@echo "  make test-frontend    - Run frontend type check"
 	@echo "  make test-ui          - Run Playwright tests with UI"
 	@echo "  make clean            - Remove build artifacts"
+	@echo "  make kill-all         - Kill all dev servers (ports 3000, 8000, 5173)"
 	@echo "  make help             - Show this help message"
 	@echo ""
 
 # Start backend, core, and frontend
 dev:
+	@echo "🔪 Killing existing processes on ports 3000, 8000, 5173..."
+	@lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+	@lsof -ti:8000 | xargs kill -9 2>/dev/null || true
+	@lsof -ti:5173 | xargs kill -9 2>/dev/null || true
 	@echo "🚀 Starting TokenForest development servers..."
 	@echo "🦀 Backend: http://localhost:3000"
 	@echo "🔧 Core: http://localhost:8000"
@@ -50,16 +65,22 @@ dev:
 
 # Start backend only
 dev-backend:
+	@echo "🔪 Killing existing process on port 3000..."
+	@lsof -ti:3000 | xargs kill -9 2>/dev/null || true
 	@echo "🦀 Starting backend server..."
 	cd backend && RUN_MODE=dev $(CARGO) run
 
 # Start core server only
 dev-core:
+	@echo "🔪 Killing existing process on port 8000..."
+	@lsof -ti:8000 | xargs kill -9 2>/dev/null || true
 	@echo "🔧 Starting core server..."
 	cd backend && RUN_MODE=dev $(CARGO) run --bin tokenforest_core
 
 # Start frontend only
 dev-frontend:
+	@echo "🔪 Killing existing process on port 5173..."
+	@lsof -ti:5173 | xargs kill -9 2>/dev/null || true
 	@echo "⚡ Starting frontend dev server..."
 	cd frontend && bun run dev
 

@@ -25,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "sqlite:./database/tokenforest.db?mode=rwc".to_string());
+        .unwrap_or_else(|_| "sqlite:/opt/tf/database/tokenforest.db?mode=rwc".to_string());
     
     let pool = SqlitePool::connect(&database_url).await?;
     tracing::info!("Core server connected to SQLite database");
@@ -33,6 +33,7 @@ async fn main() -> anyhow::Result<()> {
     db::migrate(&pool).await?;
 
     let app = Router::new()
+        .route("/health", get(health))
         .route("/v1/chat/completions", post(chat_completions))
         .route("/v1/completions", post(completions))
         .route("/v1/embeddings", post(embeddings))
@@ -55,6 +56,10 @@ async fn main() -> anyhow::Result<()> {
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+async fn health() -> &'static str {
+    "OK"
 }
 
 async fn models_list() -> &'static str {

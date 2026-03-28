@@ -48,7 +48,8 @@ pub fn is_valid_api_key_format(api_key: &str) -> bool {
 }
 
 pub fn verify_api_key(api_key: &str, key_hash: &str) -> bool {
-    verify(api_key, key_hash).unwrap_or(false)
+    let key_without_prefix = api_key.strip_prefix("tf-").unwrap_or(api_key);
+    verify(key_without_prefix, key_hash).unwrap_or(false)
 }
 
 pub fn hash_api_key(api_key: &str) -> Result<String, String> {
@@ -56,13 +57,11 @@ pub fn hash_api_key(api_key: &str) -> Result<String, String> {
 }
 
 #[async_trait]
-impl<S> FromRequestParts<S> for CoreAuth
-where
-    S: Send + Sync,
+impl FromRequestParts<SqlitePool> for CoreAuth
 {
     type Rejection = (StatusCode, Json<CoreAuthError>);
 
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, pool: &SqlitePool) -> Result<Self, Self::Rejection> {
         let auth_header = parts
             .headers
             .get("Authorization")
@@ -84,14 +83,7 @@ where
             ));
         }
 
-        let pool = parts
-            .extensions
-            .get::<SqlitePool>()
-            .cloned()
-            .ok_or((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(CoreAuthError::unauthorized("Database pool not available")),
-            ))?;
+        let pool = pool.clone();
 
         let api_keys = sqlx::query_as::<_, ApiKey>(
             "SELECT * FROM api_keys WHERE is_active = 1"
