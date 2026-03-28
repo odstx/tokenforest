@@ -31,3 +31,5 @@ bun-error.log
 
 # Testing
 coverage/
+test-results/
+playwright-report/

@@ -5,6 +5,7 @@ use axum::{
 };
 use sqlx::sqlite::SqlitePool;
 use std::net::SocketAddr;
+use tower_http::cors::{Any, CorsLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -13,6 +14,7 @@ mod auth;
 mod handlers;
 mod models;
 mod db;
+mod crypto;
 
 #[derive(OpenApi)]
 #[openapi(
@@ -23,7 +25,14 @@ mod db;
         handlers::list_api_keys,
         handlers::create_api_key,
         handlers::delete_api_key,
-        handlers::toggle_api_key
+        handlers::toggle_api_key,
+        handlers::list_token_pools,
+        handlers::create_token_pool,
+        handlers::update_token_pool,
+        handlers::delete_token_pool,
+        handlers::toggle_token_pool,
+        handlers::test_token_pool,
+        handlers::get_stats
     ),
     components(
         schemas(
@@ -31,16 +40,23 @@ mod db;
             models::ApiKeyResponse,
             models::CreateApiKeyRequest,
             models::CreateApiKeyResponse,
+            models::TokenPool,
+            models::TokenPoolResponse,
+            models::CreateTokenPoolRequest,
+            models::UpdateTokenPoolRequest,
             handlers::RegisterRequest,
             handlers::LoginRequest,
             handlers::AuthResponse,
             handlers::UserInfo,
-            handlers::ErrorResponse
+            handlers::ErrorResponse,
+            handlers::TestTokenPoolResponse,
+            handlers::StatsResponse
         )
     ),
     tags(
         (name = "auth", description = "Authentication endpoints"),
-        (name = "api-keys", description = "API key management")
+        (name = "api-keys", description = "API key management"),
+        (name = "token-pools", description = "Token pool management")
     )
 )]
 struct ApiDoc;
@@ -68,10 +84,20 @@ async fn main() -> anyhow::Result<()> {
     db::migrate(&pool).await?;
 
     let protected_routes = Router::new()
+        .route("/api/stats", get(handlers::get_stats))
         .route("/api/api-keys", get(handlers::list_api_keys).post(handlers::create_api_key))
         .route("/api/api-keys/:id", delete(handlers::delete_api_key))
         .route("/api/api-keys/:id/toggle", put(handlers::toggle_api_key))
+        .route("/api/token-pools", get(handlers::list_token_pools).post(handlers::create_token_pool))
+        .route("/api/token-pools/:id", put(handlers::update_token_pool).delete(handlers::delete_token_pool))
+        .route("/api/token-pools/:id/toggle", put(handlers::toggle_token_pool))
+        .route("/api/token-pools/:id/test", post(handlers::test_token_pool))
         .route_layer(middleware::from_fn(auth::auth_middleware));
+
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
 
     let app = Router::new()
         .route("/", get(handlers::index))
@@ -79,6 +105,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/auth/login", post(handlers::login))
         .merge(protected_routes)
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        .layer(cors)
         .with_state(pool);
 
     let host: std::net::IpAddr = std::env::var("HOST")

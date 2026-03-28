@@ -37,6 +37,7 @@
         </div>
         <div class="flex-none gap-2">
           <a href="/api-keys" class="btn btn-ghost btn-sm">{$_('nav.apiKeys')}</a>
+          <a href="/token-pools" class="btn btn-ghost btn-sm">{$_('nav.tokenPools')}</a>
           <span class="text-sm">{$_('app.welcome', { values: { username: $auth.user?.username } })}</span>
           <div class="dropdown dropdown-end">
             <label tabindex="0" class="btn btn-ghost btn-sm">

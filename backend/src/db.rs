@@ -72,6 +72,33 @@ pub async fn migrate(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     .await
     .ok();
 
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS token_pools (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            model_type TEXT NOT NULL,
+            base_url TEXT NOT NULL,
+            api_key_encrypted TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        "#,
+    )
+    .execute(pool)
+    .await?;
+
+    sqlx::query(
+        r#"
+        CREATE INDEX IF NOT EXISTS idx_token_pools_user_id ON token_pools(user_id)
+        "#,
+    )
+    .execute(pool)
+    .await?;
+
     tracing::info!("Database migrations completed");
     Ok(())
 }

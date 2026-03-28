@@ -5,6 +5,7 @@
   },
   "nav": {
     "apiKeys": "API 密钥",
+    "tokenPools": "Token 池",
     "logout": "退出登录"
   },
   "login": {
@@ -78,6 +79,64 @@
       "done": "完成"
     },
     "confirmDelete": "确定要删除此 API 密钥吗?"
+  },
+  "tokenPools": {
+    "title": "Token 池",
+    "createButton": "添加 Token 池",
+    "noPools": "暂无 Token 池，点击上方按钮添加。",
+    "table": {
+      "name": "名称",
+      "modelType": "模型",
+      "baseUrl": "基础 URL",
+      "status": "状态",
+      "lastUsed": "最后使用",
+      "created": "创建时间",
+      "actions": "操作"
+    },
+    "lastUsed": {
+      "never": "从未使用"
+    },
+    "status": {
+      "active": "启用",
+      "inactive": "禁用"
+    },
+    "actions": {
+      "edit": "编辑",
+      "test": "测试",
+      "enable": "启用",
+      "disable": "禁用",
+      "delete": "删除"
+    },
+    "test": {
+      "testing": "测试中...",
+      "success": "连接成功",
+      "failed": "连接失败",
+      "error": "测试错误"
+    },
+    "modal": {
+      "createTitle": "添加 Token 池",
+      "editTitle": "编辑 Token 池",
+      "name": "名称",
+      "namePlaceholder": "例如: OpenAI 生产环境",
+      "modelType": "模型",
+      "modelPlaceholder": "例如: gpt-4",
+      "selectModel": "选择模型...",
+      "searchModels": "搜索模型...",
+      "noModelsFound": "未找到模型",
+      "baseUrl": "基础 URL",
+      "baseUrlPlaceholder": "例如: https://api.openai.com/v1",
+      "apiKey": "API 密钥",
+      "apiKeyPlaceholder": "请输入 API 密钥",
+      "apiKeyPlaceholderEdit": "输入新的 API 密钥 (可选)",
+      "apiKeyHint": "留空则保留现有密钥",
+      "cancel": "取消",
+      "create": "添加",
+      "creating": "添加中...",
+      "save": "保存",
+      "saving": "保存中...",
+      "update": "更新"
+    },
+    "confirmDelete": "确定要删除此 Token 池吗?"
   },
   "errors": {
     "loginFailed": "登录失败",

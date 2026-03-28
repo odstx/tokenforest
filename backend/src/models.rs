@@ -73,3 +73,57 @@ pub struct PaginatedResponse<T> {
     pub page_size: u32,
     pub total_pages: u32,
 }
+
+#[derive(Debug, Serialize, Deserialize, FromRow, ToSchema)]
+pub struct TokenPool {
+    pub id: i64,
+    pub user_id: i64,
+    pub name: String,
+    pub model_type: String,
+    pub base_url: String,
+    pub api_key_encrypted: String,
+    pub is_active: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TokenPoolResponse {
+    pub id: i64,
+    pub name: String,
+    pub model_type: String,
+    pub base_url: String,
+    pub is_active: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl From<TokenPool> for TokenPoolResponse {
+    fn from(pool: TokenPool) -> Self {
+        TokenPoolResponse {
+            id: pool.id,
+            name: pool.name,
+            model_type: pool.model_type,
+            base_url: pool.base_url,
+            is_active: pool.is_active != 0,
+            created_at: pool.created_at,
+            updated_at: pool.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateTokenPoolRequest {
+    pub name: String,
+    pub model_type: String,
+    pub base_url: String,
+    pub api_key: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateTokenPoolRequest {
+    pub name: Option<String>,
+    pub model_type: Option<String>,
+    pub base_url: Option<String>,
+    pub api_key: Option<String>,
+}
