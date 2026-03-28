@@ -1,7 +1,9 @@
 # TokenForest Makefile
 # Quick commands for development and deployment
 
-.PHONY: help dev dev-backend dev-frontend build-backend build-frontend clean install-backend install-frontend
+.PHONY: help dev dev-backend dev-frontend build-backend build-frontend clean install-backend install-frontend test
+
+CARGO := $(HOME)/.cargo/bin/cargo
 
 # Default target
 help:
@@ -14,6 +16,8 @@ help:
 	@echo "  make install-frontend - Install frontend deps (bun install)"
 	@echo "  make build-backend    - Build backend for release"
 	@echo "  make build-frontend   - Build frontend for production"
+	@echo "  make test             - Run Playwright tests"
+	@echo "  make test-ui          - Run Playwright tests with UI"
 	@echo "  make clean            - Remove build artifacts"
 	@echo "  make help             - Show this help message"
 	@echo ""
@@ -27,7 +31,7 @@ dev:
 	@echo "Press Ctrl+C to stop all servers"
 	@echo ""
 	# Start backend in background
-	cargo run --manifest-path backend/Cargo.toml &
+	cd backend && RUN_MODE=dev $(CARGO) run &
 	# Wait for backend to start
 	sleep 2
 	# Start frontend
@@ -39,7 +43,7 @@ dev:
 # Start backend only
 dev-backend:
 	@echo "🦀 Starting backend server..."
-	cd backend && cargo run
+	cd backend && RUN_MODE=dev $(CARGO) run
 
 # Start frontend only
 dev-frontend:
@@ -49,7 +53,7 @@ dev-frontend:
 # Build backend
 install-backend:
 	@echo "🦀 Building backend..."
-	cd backend && cargo build
+	cd backend && $(CARGO) build
 
 # Install frontend dependencies
 install-frontend:
@@ -59,7 +63,7 @@ install-frontend:
 # Build backend for release
 build-backend:
 	@echo "🦀 Building backend for release..."
-	cd backend && cargo build --release
+	cd backend && $(CARGO) build --release
 
 # Build frontend for production
 build-frontend:
@@ -69,6 +73,16 @@ build-frontend:
 # Clean build artifacts
 clean:
 	@echo "🧹 Cleaning build artifacts..."
-	cd backend && cargo clean
+	cd backend && $(CARGO) clean
 	cd frontend && rm -rf node_modules .svelte-kit dist
 	@echo "✅ Clean complete!"
+
+# Run Playwright tests
+test:
+	@echo "🧪 Running Playwright tests..."
+	cd frontend && RUN_MODE=test bunx playwright test
+
+# Run Playwright tests with UI
+test-ui:
+	@echo "🧪 Running Playwright tests with UI..."
+	cd frontend && RUN_MODE=test bunx playwright test --ui

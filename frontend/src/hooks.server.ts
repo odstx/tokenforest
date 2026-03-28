@@ -3,7 +3,7 @@ import type { Handle } from '@sveltejs/kit';
 const API_BASE = 'http://localhost:3000';
 
 export const handle: Handle = async ({ event, resolve }) => {
-	if (event.url.pathname.startsWith('/api')) {
+	if (event.url.pathname.startsWith('/api/')) {
 		const targetUrl = `${API_BASE}${event.url.pathname}${event.url.search}`;
 		
 		const headers: Record<string, string> = {};

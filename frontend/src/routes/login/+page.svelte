@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { auth } from '../../lib/auth';
+  import { _ } from 'svelte-i18n';
 
   let username = '';
   let password = '';
@@ -21,14 +22,14 @@
       const data = await response.json();
 
       if (!response.ok) {
-        error = data.error || 'Login failed';
+        error = data.error || $_('errors.loginFailed');
         return;
       }
 
       auth.login(data.token, data.user);
       goto('/');
     } catch (err) {
-      error = err instanceof Error ? err.message : 'Login failed';
+      error = err instanceof Error ? err.message : $_('errors.loginFailed');
     } finally {
       loading = false;
     }
@@ -38,8 +39,8 @@
 <div class="flex items-center justify-center min-h-screen">
   <div class="card w-full max-w-sm bg-base-100 shadow-xl">
     <div class="card-body">
-      <h1 class="card-title text-2xl justify-center">🌲 TokenForest</h1>
-      <p class="text-center text-base-content/70 mb-4">Sign in to your account</p>
+      <h1 class="card-title text-2xl justify-center">🌲 {$_('app.name')}</h1>
+      <p class="text-center text-base-content/70 mb-4">{$_('login.title')}</p>
 
       <form on:submit|preventDefault={handleLogin}>
         {#if error}
@@ -50,40 +51,40 @@
 
         <div class="form-control w-full mb-4">
           <label class="label" for="username">
-            <span class="label-text">Username</span>
+            <span class="label-text">{$_('login.username')}</span>
           </label>
           <input
             type="text"
             id="username"
             class="input input-bordered w-full"
             bind:value={username}
-            placeholder="Enter your username"
+            placeholder={$_('login.usernamePlaceholder')}
             required
           />
         </div>
 
         <div class="form-control w-full mb-4">
           <label class="label" for="password">
-            <span class="label-text">Password</span>
+            <span class="label-text">{$_('login.password')}</span>
           </label>
           <input
             type="password"
             id="password"
             class="input input-bordered w-full"
             bind:value={password}
-            placeholder="Enter your password"
+            placeholder={$_('login.passwordPlaceholder')}
             required
           />
         </div>
 
         <div class="form-control mt-6">
           <button type="submit" class="btn btn-primary" disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? $_('login.signingIn') : $_('login.signIn')}
           </button>
         </div>
 
         <p class="text-center mt-4">
-          Don't have an account? <a href="/register" class="link link-primary">Register</a>
+          {$_('login.noAccount')} <a href="/register" class="link link-primary">{$_('login.register')}</a>
         </p>
       </form>
     </div>

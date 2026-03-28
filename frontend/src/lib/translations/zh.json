@@ -1,0 +1,94 @@
+{
+  "app": {
+    "name": "TokenForest",
+    "welcome": "欢迎, {username}"
+  },
+  "nav": {
+    "apiKeys": "API 密钥",
+    "logout": "退出登录"
+  },
+  "login": {
+    "title": "登录您的账户",
+    "username": "用户名",
+    "password": "密码",
+    "usernamePlaceholder": "请输入用户名",
+    "passwordPlaceholder": "请输入密码",
+    "signIn": "登录",
+    "signingIn": "登录中...",
+    "noAccount": "还没有账户?",
+    "register": "注册"
+  },
+  "register": {
+    "title": "创建您的账户",
+    "username": "用户名",
+    "password": "密码",
+    "confirmPassword": "确认密码",
+    "usernamePlaceholder": "请输入用户名",
+    "passwordPlaceholder": "请输入密码",
+    "confirmPasswordPlaceholder": "请再次输入密码",
+    "createAccount": "创建账户",
+    "creating": "创建中...",
+    "hasAccount": "已有账户?",
+    "signIn": "登录",
+    "passwordMismatch": "两次密码输入不一致",
+    "passwordTooShort": "密码至少需要6个字符"
+  },
+  "apiKeys": {
+    "title": "API 密钥",
+    "createButton": "创建 API 密钥",
+    "noKeys": "暂无 API 密钥，点击上方按钮创建。",
+    "table": {
+      "name": "名称",
+      "model": "模型",
+      "keyPrefix": "密钥前缀",
+      "status": "状态",
+      "lastUsed": "最后使用",
+      "created": "创建时间",
+      "actions": "操作"
+    },
+    "status": {
+      "active": "启用",
+      "inactive": "禁用"
+    },
+    "actions": {
+      "enable": "启用",
+      "disable": "禁用",
+      "delete": "删除"
+    },
+    "lastUsed": {
+      "never": "从未使用"
+    },
+    "model": {
+      "any": "任意"
+    },
+    "modal": {
+      "title": "创建 API 密钥",
+      "keyName": "密钥名称",
+      "keyNamePlaceholder": "例如: 生产服务器",
+      "modelOptional": "模型 (可选)",
+      "selectModel": "选择模型...",
+      "searchModels": "搜索模型...",
+      "noModelsFound": "未找到模型",
+      "created": "API 密钥创建成功!",
+      "copyWarning": "请立即复制您的密钥，此密钥仅显示一次。",
+      "copy": "复制",
+      "cancel": "取消",
+      "create": "创建",
+      "creating": "创建中...",
+      "done": "完成"
+    },
+    "confirmDelete": "确定要删除此 API 密钥吗?"
+  },
+  "errors": {
+    "loginFailed": "登录失败",
+    "registrationFailed": "注册失败",
+    "fetchFailed": "获取 API 密钥失败",
+    "createFailed": "创建 API 密钥失败",
+    "deleteFailed": "删除 API 密钥失败",
+    "toggleFailed": "切换 API 密钥状态失败"
+  },
+  "language": {
+    "en": "English",
+    "zh": "中文"
+  }
+}

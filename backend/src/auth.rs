@@ -3,7 +3,7 @@ use axum::{
     extract::{FromRequestParts, Request},
     http::{request::Parts, StatusCode},
     middleware::Next,
-    response::{IntoResponse, Response},
+    response::Response,
 };
 use axum_extra::{
     headers::{Authorization, authorization::Bearer},
@@ -15,18 +15,21 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::models::User;
 
-pub const JWT_SECRET: &[u8] = b"your-secret-key-change-in-production";
+pub fn get_jwt_secret() -> &'static [u8] {
+    static SECRET: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    SECRET.get_or_init(|| {
+        std::env::var("JWT_SECRET")
+            .unwrap_or_else(|_| "default-secret-key-change-me".to_string())
+            .into_bytes()
+    })
+    .as_slice()
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
     pub sub: i64,
     pub username: String,
     pub exp: usize,
-}
-
-#[derive(Debug, Serialize)]
-pub struct AuthError {
-    pub message: String,
 }
 
 pub fn create_jwt_token(user: &User) -> Result<String, jsonwebtoken::errors::Error> {
@@ -45,14 +48,14 @@ pub fn create_jwt_token(user: &User) -> Result<String, jsonwebtoken::errors::Err
     encode(
         &Header::default(),
         &claims,
-        &EncodingKey::from_secret(JWT_SECRET),
+        &EncodingKey::from_secret(get_jwt_secret()),
     )
 }
 
 pub fn verify_token(token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
     let token_data = decode::<Claims>(
         token,
-        &DecodingKey::from_secret(JWT_SECRET),
+        &DecodingKey::from_secret(get_jwt_secret()),
         &Validation::default(),
     );
     token_data.map(|data| data.claims)
