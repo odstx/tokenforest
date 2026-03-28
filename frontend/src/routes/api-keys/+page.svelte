@@ -13,6 +13,7 @@
     is_active: boolean;
     last_used_at: string | null;
     created_at: string;
+    allowed_cidrs?: string[];
   }
 
   interface PaginatedResponse {
@@ -29,13 +30,21 @@
   let showModal = false;
   let newKeyName = '';
   let newKeyModel = '';
+  let newKeyCidrs: string[] = [];
+  let cidrInput = '';
   let modelSearch = '';
   let modelDropdownOpen = false;
   let modelDropdownTop = 0;
   let modelDropdownLeft = 0;
   let modelDropdownWidth = 0;
+  let actionDropdownOpen: number | null = null;
+  let actionDropdownTop = 0;
+  let actionDropdownLeft = 0;
   let creatingKey = false;
   let createdKey: string | null = null;
+  let editMode = false;
+  let editingId: number | null = null;
+  let savingKey = false;
 
   const commonModels = [
     { id: 'gpt-4o', name: 'GPT-4o', provider: 'OpenAI' },
@@ -84,6 +93,38 @@
     modelDropdownWidth = rect.width;
     modelDropdownOpen = true;
     modelSearch = '';
+  }
+
+  function openActionDropdown(event: MouseEvent, keyId: number) {
+    const target = event.currentTarget as HTMLElement;
+    const rect = target.getBoundingClientRect();
+    actionDropdownTop = rect.bottom + 4;
+    actionDropdownLeft = rect.right - 160;
+    actionDropdownOpen = keyId;
+  }
+
+  function closeActionDropdown() {
+    actionDropdownOpen = null;
+  }
+
+  function handleToggleAction() {
+    const keyId = actionDropdownOpen;
+    if (keyId !== null) {
+      closeActionDropdown();
+      toggleKey(keyId);
+    }
+  }
+
+  function handleDeleteAction() {
+    const keyId = actionDropdownOpen;
+    if (keyId !== null) {
+      closeActionDropdown();
+      deleteKey(keyId);
+    }
+  }
+
+  function getActionKey() {
+    return apiKeys.find(k => k.id === actionDropdownOpen);
   }
 
   let page = 1;
@@ -152,7 +193,8 @@
         },
         body: JSON.stringify({ 
           name: newKeyName.trim(),
-          model: newKeyModel || null
+          model: newKeyModel || null,
+          allowed_cidrs: newKeyCidrs.length > 0 ? newKeyCidrs : null
         })
       });
 
@@ -223,11 +265,76 @@
     }
   }
 
+  function addCidr() {
+    const cidr = cidrInput.trim();
+    if (cidr && !newKeyCidrs.includes(cidr)) {
+      newKeyCidrs = [...newKeyCidrs, cidr];
+      cidrInput = '';
+    }
+  }
+
+  function removeCidr(cidr: string) {
+    newKeyCidrs = newKeyCidrs.filter(c => c !== cidr);
+  }
+
+  function handleEditAction() {
+    const key = getActionKey();
+    if (key) {
+      editMode = true;
+      editingId = key.id;
+      newKeyName = key.name;
+      newKeyModel = key.model || '';
+      newKeyCidrs = key.allowed_cidrs || [];
+      closeActionDropdown();
+      showModal = true;
+    }
+  }
+
+  async function saveKey() {
+    if (!browser || !newKeyName.trim()) return;
+    
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    savingKey = true;
+    error = null;
+
+    try {
+      const response = await fetch(`/api/api-keys/${editingId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          name: newKeyName.trim(),
+          model: newKeyModel || null,
+          allowed_cidrs: newKeyCidrs.length > 0 ? newKeyCidrs : null
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update API key');
+      }
+
+      closeModal();
+      await fetchApiKeys();
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to update API key';
+    } finally {
+      savingKey = false;
+    }
+  }
+
   function closeModal() {
     showModal = false;
     createdKey = null;
+    editMode = false;
+    editingId = null;
     newKeyName = '';
     newKeyModel = '';
+    newKeyCidrs = [];
+    cidrInput = '';
     modelSearch = '';
     modelDropdownOpen = false;
   }
@@ -268,6 +375,7 @@
           <tr>
             <th>{$_('apiKeys.table.name')}</th>
             <th>{$_('apiKeys.table.model')}</th>
+            <th>{$_('apiKeys.table.cidrRestrictions')}</th>
             <th>{$_('apiKeys.table.keyPrefix')}</th>
             <th>{$_('apiKeys.table.status')}</th>
             <th>{$_('apiKeys.table.lastUsed')}</th>
@@ -278,35 +386,40 @@
         <tbody>
           {#each apiKeys as key}
             <tr>
-              <td>{key.name}</td>
-              <td>
+              <td class="whitespace-nowrap">{key.name}</td>
+              <td class="whitespace-nowrap">
                 {#if key.model}
                   <span class="badge badge-outline badge-sm">{key.model}</span>
                 {:else}
                   <span class="text-base-content/50">{$_('apiKeys.model.any')}</span>
                 {/if}
               </td>
-              <td><code class="bg-base-300 px-2 py-1 rounded">{key.prefix}...</code></td>
-              <td>
+              <td class="whitespace-nowrap">
+                {#if key.allowed_cidrs && key.allowed_cidrs.length > 0}
+                  {#each key.allowed_cidrs as cidr}
+                    <span class="badge badge-outline badge-sm mr-1">{cidr}</span>
+                  {/each}
+                {:else}
+                  <span class="text-base-content/50">{$_('apiKeys.cidr.any')}</span>
+                {/if}
+              </td>
+              <td class="whitespace-nowrap"><code class="bg-base-300 px-2 py-1 rounded">{key.prefix}...</code></td>
+              <td class="whitespace-nowrap">
                 <span class="badge {key.is_active ? 'badge-success' : 'badge-error'}">
                   {key.is_active ? $_('apiKeys.status.active') : $_('apiKeys.status.inactive')}
                 </span>
               </td>
-              <td>{key.last_used_at || $_('apiKeys.lastUsed.never')}</td>
-              <td>{new Date(key.created_at).toLocaleDateString()}</td>
-              <td>
-                <div class="flex gap-2">
+              <td class="whitespace-nowrap">{key.last_used_at || $_('apiKeys.lastUsed.never')}</td>
+              <td class="whitespace-nowrap">{new Date(key.created_at).toLocaleDateString()}</td>
+              <td class="whitespace-nowrap">
+                <div class="relative">
                   <button 
                     class="btn btn-sm btn-outline"
-                    on:click={() => toggleKey(key.id)}
+                    on:click={(e) => openActionDropdown(e, key.id)}
                   >
-                    {key.is_active ? $_('apiKeys.actions.disable') : $_('apiKeys.actions.enable')}
-                  </button>
-                  <button 
-                    class="btn btn-sm btn-error btn-outline"
-                    on:click={() => deleteKey(key.id)}
-                  >
-                    {$_('apiKeys.actions.delete')}
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 0 110-2 1 0 110 2zm0 7a1 0 110-2 1 0 110 2zm0 7a1 0 110-2 1 0 110 2z" />
+                    </svg>
                   </button>
                 </div>
               </td>
@@ -348,7 +461,7 @@
 {#if showModal}
   <div class="modal modal-open">
     <div class="modal-box">
-      <h3 class="font-bold text-lg mb-4">{$_('apiKeys.modal.title')}</h3>
+      <h3 class="font-bold text-lg mb-4">{editMode ? $_('apiKeys.modal.editTitle') : $_('apiKeys.modal.title')}</h3>
       
       {#if createdKey}
         <div class="alert alert-success mb-4">
@@ -398,11 +511,53 @@
             {/if}
           </button>
         </div>
+        
+        <div class="form-control mb-4">
+          <label class="label">
+            <span class="label-text">{$_('apiKeys.cidr.title')}</span>
+          </label>
+          <div class="flex gap-2 mb-2">
+            <input 
+              type="text" 
+              class="input input-bordered flex-1"
+              bind:value={cidrInput}
+              placeholder={$_('apiKeys.cidr.placeholder')}
+              on:keydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCidr(); } }}
+            />
+            <button type="button" class="btn btn-outline" on:click={addCidr}>
+              {$_('apiKeys.cidr.add')}
+            </button>
+          </div>
+          {#if newKeyCidrs.length > 0}
+            <div class="flex flex-wrap gap-2">
+              {#each newKeyCidrs as cidr}
+                <span class="badge badge-outline gap-1">
+                  {cidr}
+                  <button type="button" class="btn btn-ghost btn-xs p-0 h-auto min-h-0" on:click={() => removeCidr(cidr)}>
+                    ×
+                  </button>
+                </span>
+              {/each}
+            </div>
+          {/if}
+          <label class="label">
+            <span class="label-text-alt text-base-content/60">{$_('apiKeys.cidr.hint')}</span>
+          </label>
+        </div>
       {/if}
 
       <div class="modal-action">
         {#if createdKey}
           <button class="btn" on:click={closeModal}>{$_('apiKeys.modal.done')}</button>
+        {:else if editMode}
+          <button class="btn btn-outline" on:click={closeModal}>{$_('apiKeys.modal.cancel')}</button>
+          <button 
+            class="btn btn-primary" 
+            on:click={saveKey}
+            disabled={!newKeyName.trim() || savingKey}
+          >
+            {savingKey ? $_('apiKeys.modal.saving') : $_('apiKeys.modal.save')}
+          </button>
         {:else}
           <button class="btn btn-outline" on:click={closeModal}>{$_('apiKeys.modal.cancel')}</button>
           <button 
@@ -449,5 +604,31 @@
         {/if}
       </ul>
     </div>
+  </div>
+{/if}
+
+{#if actionDropdownOpen !== null}
+  <div class="fixed inset-0 z-[9999]" on:click={closeActionDropdown}>
+    <ul 
+      class="absolute menu bg-base-100 rounded-box shadow-xl border border-base-300 p-2 w-40"
+      style="top: {actionDropdownTop}px; left: {actionDropdownLeft}px;"
+      on:click|stopPropagation
+    >
+      <li>
+        <button on:click={handleEditAction}>
+          {$_('apiKeys.actions.edit')}
+        </button>
+      </li>
+      <li>
+        <button on:click={handleToggleAction}>
+          {getActionKey()?.is_active ? $_('apiKeys.actions.disable') : $_('apiKeys.actions.enable')}
+        </button>
+      </li>
+      <li>
+        <button class="text-error" on:click={handleDeleteAction}>
+          {$_('apiKeys.actions.delete')}
+        </button>
+      </li>
+    </ul>
   </div>
 {/if}

@@ -10,7 +10,9 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 
 use super::auth::CoreAuth;
+use super::metrics;
 use crate::crypto;
+
 use crate::models::TokenPool;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -46,6 +48,29 @@ impl ProxyError {
     pub fn internal(msg: &str) -> Self {
         Self::new(msg, "server_error")
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatRequest {
+    #[allow(dead_code)]
+    model: Option<String>,
+    stream: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Usage {
+    prompt_tokens: u64,
+    completion_tokens: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatResponse {
+    usage: Option<Usage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct StreamChunk {
+    usage: Option<Usage>,
 }
 
 pub fn build_target_url(base_url: &str, path: &str) -> String {
@@ -104,6 +129,9 @@ pub async fn proxy_to_token_pool(
         Json(ProxyError::bad_request("API key has no model configured")),
     ))?;
 
+    let chat_request: Option<ChatRequest> = serde_json::from_slice(&body).ok();
+    let is_stream = chat_request.as_ref().and_then(|r| r.stream).unwrap_or(false);
+
     let token_pools = sqlx::query_as::<_, TokenPool>(
         "SELECT * FROM token_pools WHERE model_type = ? AND is_active = 1"
     )
@@ -157,11 +185,12 @@ pub async fn proxy_to_token_pool(
         .header("Content-Type", "application/json");
 
     if !body.is_empty() {
-        request_builder = request_builder.body(body);
+        request_builder = request_builder.body(body.clone());
     }
 
     let response = request_builder.send().await.map_err(|e| {
         tracing::error!("Proxy request failed: {}", e);
+        metrics::record_request(model, &api_key.id.to_string(), "error");
         (
             StatusCode::BAD_GATEWAY,
             Json(ProxyError::internal(&format!("Upstream request failed: {}", e))),
@@ -172,11 +201,27 @@ pub async fn proxy_to_token_pool(
     let response_headers = response.headers().clone();
     let response_body = response.bytes().await.map_err(|e| {
         tracing::error!("Failed to read upstream response: {}", e);
+        metrics::record_request(model, &api_key.id.to_string(), "error");
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ProxyError::internal("Failed to read upstream response")),
         )
     })?;
+
+    if status.is_success() {
+        let (input_tokens, output_tokens) = if is_stream {
+            parse_stream_usage(&response_body)
+        } else {
+            parse_non_stream_usage(&response_body)
+        };
+        
+        if input_tokens > 0 || output_tokens > 0 {
+            metrics::record_tokens(model, &api_key.id.to_string(), input_tokens, output_tokens);
+        }
+        metrics::record_request(model, &api_key.id.to_string(), "success");
+    } else {
+        metrics::record_request(model, &api_key.id.to_string(), "error");
+    }
 
     let mut builder = Response::builder().status(status);
 
@@ -193,6 +238,39 @@ pub async fn proxy_to_token_pool(
             Json(ProxyError::internal("Failed to build response")),
         )
     })
+}
+
+fn parse_non_stream_usage(body: &[u8]) -> (u64, u64) {
+    let response: ChatResponse = match serde_json::from_slice(body) {
+        Ok(r) => r,
+        Err(_) => return (0, 0),
+    };
+    
+    match response.usage {
+        Some(usage) => (usage.prompt_tokens, usage.completion_tokens),
+        None => (0, 0),
+    }
+}
+
+fn parse_stream_usage(body: &[u8]) -> (u64, u64) {
+    let body_str = match std::str::from_utf8(body) {
+        Ok(s) => s,
+        Err(_) => return (0, 0),
+    };
+    
+    for line in body_str.lines() {
+        if let Some(data) = line.strip_prefix("data: ") {
+            if data == "[DONE]" {
+                continue;
+            }
+            if let Ok(chunk) = serde_json::from_str::<StreamChunk>(data) {
+                if let Some(usage) = chunk.usage {
+                    return (usage.prompt_tokens, usage.completion_tokens);
+                }
+            }
+        }
+    }
+    (0, 0)
 }
 
 #[cfg(test)]

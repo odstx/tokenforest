@@ -1,5 +1,5 @@
 use axum::{
-    routing::{get, post, put, delete},
+    routing::{get, post, put},
     Router,
     middleware,
 };
@@ -11,6 +11,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 mod auth;
+#[allow(dead_code)]
 mod core;
 mod handlers;
 mod models;
@@ -87,7 +88,7 @@ async fn main() -> anyhow::Result<()> {
     let protected_routes = Router::new()
         .route("/api/stats", get(handlers::get_stats))
         .route("/api/api-keys", get(handlers::list_api_keys).post(handlers::create_api_key))
-        .route("/api/api-keys/:id", delete(handlers::delete_api_key))
+        .route("/api/api-keys/:id", put(handlers::update_api_key).delete(handlers::delete_api_key))
         .route("/api/api-keys/:id/toggle", put(handlers::toggle_api_key))
         .route("/api/token-pools", get(handlers::list_token_pools).post(handlers::create_token_pool))
         .route("/api/token-pools/:id", put(handlers::update_token_pool).delete(handlers::delete_token_pool))

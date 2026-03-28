@@ -74,6 +74,15 @@ pub async fn migrate(pool: &SqlitePool) -> Result<(), sqlx::Error> {
 
     sqlx::query(
         r#"
+        ALTER TABLE api_keys ADD COLUMN allowed_cidrs TEXT
+        "#,
+    )
+    .execute(pool)
+    .await
+    .ok();
+
+    sqlx::query(
+        r#"
         CREATE TABLE IF NOT EXISTS token_pools (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,

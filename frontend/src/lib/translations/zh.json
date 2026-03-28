@@ -45,6 +45,7 @@
       "status": "状态",
       "lastUsed": "最后使用",
       "created": "创建时间",
+      "cidrRestrictions": "IP 限制",
       "actions": "操作"
     },
     "status": {
@@ -54,6 +55,7 @@
     "actions": {
       "enable": "启用",
       "disable": "禁用",
+      "edit": "编辑",
       "delete": "删除"
     },
     "lastUsed": {
@@ -62,8 +64,16 @@
     "model": {
       "any": "任意"
     },
+    "cidr": {
+      "title": "IP 限制 (可选)",
+      "placeholder": "例如: 192.168.1.0/24",
+      "add": "添加",
+      "any": "任意 IP",
+      "hint": "将此密钥限制为特定 IP 地址或范围 (CIDR 表示法)"
+    },
     "modal": {
       "title": "创建 API 密钥",
+      "editTitle": "编辑 API 密钥",
       "keyName": "密钥名称",
       "keyNamePlaceholder": "例如: 生产服务器",
       "modelOptional": "模型 (可选)",
@@ -76,6 +86,8 @@
       "cancel": "取消",
       "create": "创建",
       "creating": "创建中...",
+      "save": "保存",
+      "saving": "保存中...",
       "done": "完成"
     },
     "confirmDelete": "确定要删除此 API 密钥吗?"

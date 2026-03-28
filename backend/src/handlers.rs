@@ -10,7 +10,7 @@ use utoipa::ToSchema;
 
 use crate::auth::{create_jwt_token, CurrentUser};
 use crate::crypto;
-use crate::models::{ApiKey, ApiKeyResponse, CreateApiKeyRequest, CreateApiKeyResponse, PaginatedResponse, PaginationQuery, TokenPool, TokenPoolResponse, CreateTokenPoolRequest, UpdateTokenPoolRequest, User};
+use crate::models::{ApiKey, ApiKeyResponse, CreateApiKeyRequest, CreateApiKeyResponse, PaginatedResponse, PaginationQuery, TokenPool, TokenPoolResponse, CreateTokenPoolRequest, UpdateTokenPoolRequest, UpdateApiKeyRequest, User};
 
 pub type AppPool = SqlitePool;
 
@@ -343,6 +343,7 @@ pub async fn list_api_keys(
             model: k.model,
             prefix: k.prefix,
             is_active: k.is_active != 0,
+            allowed_cidrs: k.allowed_cidrs.as_ref().and_then(|s| serde_json::from_str(s).ok()),
             last_used_at: k.last_used_at,
             created_at: k.created_at,
         })
@@ -396,14 +397,17 @@ pub async fn create_api_key(
         )
     })?;
 
+    let allowed_cidrs_json = payload.allowed_cidrs.as_ref().map(|v| serde_json::to_string(v).unwrap_or_default());
+
     let result = sqlx::query(
-        "INSERT INTO api_keys (user_id, name, model, key_hash, prefix, is_active, created_at) VALUES (?, ?, ?, ?, ?, 1, datetime('now'))"
+        "INSERT INTO api_keys (user_id, name, model, key_hash, prefix, is_active, allowed_cidrs, created_at) VALUES (?, ?, ?, ?, ?, 1, ?, datetime('now'))"
     )
     .bind(claims.sub)
     .bind(&payload.name)
     .bind(&payload.model)
     .bind(&key_hash)
     .bind(&prefix)
+    .bind(&allowed_cidrs_json)
     .execute(&pool)
     .await
     .map_err(|_| {
@@ -421,6 +425,7 @@ pub async fn create_api_key(
         model: payload.model,
         key: format!("tf-{}", raw_key),
         prefix,
+        allowed_cidrs: payload.allowed_cidrs,
     }))
 }
 
@@ -523,14 +528,100 @@ pub async fn toggle_api_key(
             )
         })?;
 
+    let allowed_cidrs: Option<Vec<String>> = key.allowed_cidrs
+        .and_then(|s| serde_json::from_str(&s).ok());
+
     Ok(Json(ApiKeyResponse {
         id: key.id,
         name: key.name,
         model: key.model,
         prefix: key.prefix,
         is_active: new_active != 0,
+        allowed_cidrs,
         last_used_at: key.last_used_at,
         created_at: key.created_at,
+    }))
+}
+
+#[utoipa::path(
+    put,
+    path = "/api/api-keys/{id}",
+    request_body = UpdateApiKeyRequest,
+    responses(
+        (status = 200, description = "API key updated", body = ApiKeyResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "API key not found", body = ErrorResponse)
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn update_api_key(
+    State(pool): State<AppPool>,
+    CurrentUser(claims): CurrentUser,
+    axum::extract::Path(id): axum::extract::Path<i64>,
+    Json(payload): Json<UpdateApiKeyRequest>,
+) -> Result<Json<ApiKeyResponse>, (StatusCode, Json<ErrorResponse>)> {
+    let existing = sqlx::query_as::<_, ApiKey>(
+        "SELECT * FROM api_keys WHERE id = ? AND user_id = ?"
+    )
+    .bind(id)
+    .bind(claims.sub)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: "Failed to fetch API key".to_string(),
+            }),
+        )
+    })?;
+
+    let existing = existing.ok_or((
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+            error: "API key not found".to_string(),
+        }),
+    ))?;
+
+    let name = payload.name.unwrap_or(existing.name);
+    let model = payload.model.or(existing.model);
+    let allowed_cidrs_json = match payload.allowed_cidrs {
+        Some(ref v) => Some(serde_json::to_string(v).unwrap_or_default()),
+        None => existing.allowed_cidrs,
+    };
+
+    sqlx::query(
+        "UPDATE api_keys SET name = ?, model = ?, allowed_cidrs = ? WHERE id = ?"
+    )
+    .bind(&name)
+    .bind(&model)
+    .bind(&allowed_cidrs_json)
+    .bind(id)
+    .execute(&pool)
+    .await
+    .map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: "Failed to update API key".to_string(),
+            }),
+        )
+    })?;
+
+    let allowed_cidrs: Option<Vec<String>> = allowed_cidrs_json
+        .and_then(|s| serde_json::from_str(&s).ok());
+
+    Ok(Json(ApiKeyResponse {
+        id,
+        name,
+        model,
+        prefix: existing.prefix,
+        is_active: existing.is_active != 0,
+        allowed_cidrs,
+        last_used_at: existing.last_used_at,
+        created_at: existing.created_at,
     }))
 }
 

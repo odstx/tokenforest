@@ -19,6 +19,7 @@ pub struct ApiKey {
     pub key_hash: String,
     pub prefix: String,
     pub is_active: i32,
+    pub allowed_cidrs: Option<String>,
     pub last_used_at: Option<String>,
     pub created_at: String,
 }
@@ -30,6 +31,7 @@ pub struct ApiKeyResponse {
     pub model: Option<String>,
     pub prefix: String,
     pub is_active: bool,
+    pub allowed_cidrs: Option<Vec<String>>,
     pub last_used_at: Option<String>,
     pub created_at: String,
 }
@@ -38,6 +40,7 @@ pub struct ApiKeyResponse {
 pub struct CreateApiKeyRequest {
     pub name: String,
     pub model: Option<String>,
+    pub allowed_cidrs: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -47,6 +50,14 @@ pub struct CreateApiKeyResponse {
     pub model: Option<String>,
     pub key: String,
     pub prefix: String,
+    pub allowed_cidrs: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateApiKeyRequest {
+    pub name: Option<String>,
+    pub model: Option<String>,
+    pub allowed_cidrs: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]

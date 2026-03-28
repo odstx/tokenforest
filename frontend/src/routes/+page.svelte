@@ -53,19 +53,19 @@
     <h1 class="text-2xl font-bold mb-6">Dashboard</h1>
     
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div class="card bg-base-200 shadow">
+      <a href="/api-keys" class="card bg-base-200 shadow hover:bg-base-300 transition-colors cursor-pointer">
         <div class="card-body">
           <h2 class="card-title text-lg">API Keys</h2>
           <p class="text-4xl font-bold text-primary">{stats.api_keys_count}</p>
         </div>
-      </div>
+      </a>
       
-      <div class="card bg-base-200 shadow">
+      <a href="/token-pools" class="card bg-base-200 shadow hover:bg-base-300 transition-colors cursor-pointer">
         <div class="card-body">
           <h2 class="card-title text-lg">Token Pools</h2>
           <p class="text-4xl font-bold text-secondary">{stats.token_pools_count}</p>
         </div>
-      </div>
+      </a>
     </div>
   {/if}
 </div>

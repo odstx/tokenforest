@@ -2,11 +2,14 @@ use axum::{
     routing::{get, post},
     Router,
     extract::DefaultBodyLimit,
+    http::{StatusCode, header},
+    response::IntoResponse,
 };
 use sqlx::sqlite::SqlitePool;
 use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+use tokenforest_backend::core::metrics;
 use tokenforest_backend::core::proxy::{chat_completions, completions, embeddings};
 use tokenforest_backend::db;
 
@@ -24,6 +27,8 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    metrics::init();
+
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "sqlite:/opt/tf/database/tokenforest.db?mode=rwc".to_string());
     
@@ -34,6 +39,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/health", get(health))
+        .route("/metrics", get(metrics_handler))
         .route("/v1/chat/completions", post(chat_completions))
         .route("/v1/completions", post(completions))
         .route("/v1/embeddings", post(embeddings))
@@ -64,4 +70,12 @@ async fn health() -> &'static str {
 
 async fn models_list() -> &'static str {
     r#"{"object":"list","data":[]}"#
+}
+
+async fn metrics_handler() -> impl IntoResponse {
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "text/plain; version=0.0.4; charset=utf-8")],
+        metrics::export(),
+    )
 }
