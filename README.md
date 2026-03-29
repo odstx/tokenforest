@@ -1,135 +1,84 @@
 # TokenForest
 
-A modern full-stack token management application for managing AI API keys and token pools.
+[English](README.md) | [中文](README_CN.md)
+
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
+A modern full-stack application for managing AI API keys and token pools.
 
 ## Features
 
-- **User Authentication** - Register, login with JWT-based sessions
-- **API Key Management** - Create, list, toggle, delete API keys
-- **Token Pool Management** - Manage token pools with different AI models
-- **Dashboard Stats** - Overview of API keys and token pools counts
-- **Swagger UI** - Interactive API documentation at `/swagger-ui`
-- **Responsive Design** - Works on desktop and mobile
+- User authentication with JWT
+- API key management with CIDR restrictions
+- Token pool management for multiple AI models
+- Dashboard with usage statistics
+- Swagger UI API documentation
+- Responsive web interface
 
 ## Tech Stack
 
-**Backend**
-- Rust + Axum (web framework)
-- SQLx + SQLite (database)
-- Tokio (async runtime)
-- utoipa + swagger-ui (OpenAPI docs)
-- JWT for authentication
-
-**Frontend**
-- SvelteKit + Vite
-- Bun runtime
-- TypeScript
-- Tailwind CSS + DaisyUI
+| Layer | Technologies |
+|-------|-------------|
+| Backend | Rust, Axum, SQLx, SQLite, Tokio |
+| Frontend | SvelteKit, TypeScript, Tailwind CSS, DaisyUI |
+| Runtime | Bun (frontend), Tokio (backend) |
 
 ## Quick Start
 
 ```bash
-# Start both backend and frontend
 make dev
-
-# Or see all available commands
-make help
 ```
 
-This starts:
-- Backend API at http://localhost:3000
-- Frontend at http://localhost:5173
-- Swagger UI at http://localhost:3000/swagger-ui
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:5173 |
+| Backend API | http://localhost:3000 |
+| Swagger UI | http://localhost:3000/swagger-ui |
 
-## API Endpoints
+## API Reference
 
-### Authentication
+### Auth
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/auth/register` | Register new user |
-| POST | `/api/auth/login` | Login and get JWT token |
+| POST | `/api/auth/register` | Register user |
+| POST | `/api/auth/login` | Login |
 
-### API Keys (requires auth)
+### API Keys
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/api-keys` | List all API keys |
-| POST | `/api/api-keys` | Create new API key |
-| DELETE | `/api/api-keys/:id` | Delete API key |
-| PUT | `/api/api-keys/:id/toggle` | Enable/disable API key |
+| GET | `/api/api-keys` | List keys |
+| POST | `/api/api-keys` | Create key |
+| DELETE | `/api/api-keys/:id` | Delete key |
+| PUT | `/api/api-keys/:id/toggle` | Toggle key |
 
-### Token Pools (requires auth)
+### Token Pools
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/token-pools` | List all token pools |
-| POST | `/api/token-pools` | Create new token pool |
-| PUT | `/api/token-pools/:id` | Update token pool |
-| DELETE | `/api/token-pools/:id` | Delete token pool |
-| PUT | `/api/token-pools/:id/toggle` | Enable/disable token pool |
-| POST | `/api/token-pools/:id/test` | Test token pool connection |
+| GET | `/api/token-pools` | List pools |
+| POST | `/api/token-pools` | Create pool |
+| PUT | `/api/token-pools/:id` | Update pool |
+| DELETE | `/api/token-pools/:id` | Delete pool |
+| PUT | `/api/token-pools/:id/toggle` | Toggle pool |
+| POST | `/api/token-pools/:id/test` | Test connection |
 
-### Stats (requires auth)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/stats` | Get API keys and token pools counts |
-
-## Project Structure
-
-```
-tokenforest/
-├── backend/
-│   ├── src/
-│   │   ├── main.rs        # Entry point, routes, OpenAPI spec
-│   │   ├── handlers.rs    # HTTP request handlers
-│   │   ├── models.rs      # Data models
-│   │   ├── db.rs          # Database migrations
-│   │   ├── auth.rs        # JWT authentication middleware
-│   │   └── crypto.rs      # Password hashing
-│   └── Cargo.toml
-├── frontend/
-│   ├── src/
-│   │   ├── routes/
-│   │   │   ├── +page.svelte       # Homepage with stats dashboard
-│   │   │   ├── +layout.svelte     # Layout with navigation
-│   │   │   ├── login/             # Login page
-│   │   │   ├── register/          # Registration page
-│   │   │   ├── api-keys/          # API keys management
-│   │   │   └── token-pools/       # Token pools management
-│   │   └── lib/                   # Shared components
-│   └── package.json
-├── database/
-│   └── tokenforest.db     # SQLite database (auto-created)
-├── docs/
-├── Makefile
-└── README.md
-```
-
-## Development Commands
+## Development
 
 | Command | Description |
 |---------|-------------|
-| `make dev` | Start backend (port 3000) & frontend (port 5173) |
-| `make dev-backend` | Start backend only |
-| `make dev-frontend` | Start frontend only |
-| `make install-backend` | Build backend (debug) |
-| `make install-frontend` | Install frontend dependencies |
-| `make build-backend` | Release build (backend) |
-| `make build-frontend` | Production build (frontend) |
-| `make clean` | Remove build artifacts |
-
-### Lint & Typecheck
+| `make dev` | Start backend + frontend |
+| `make build-backend` | Release build |
+| `make build-frontend` | Production build |
+| `make clean` | Remove artifacts |
 
 ```bash
-# Frontend
+# Lint & test
 cd frontend && bun run check
-
-# Backend
-cd backend && cargo clippy
-cd backend && cargo test
+cd backend && cargo clippy && cargo test
 ```
 
-## Environment Variables
+## Configuration
 
-Backend (`.dev.env`):
+Backend `.dev.env`:
 ```
 DATABASE_URL=sqlite:./database/tokenforest.db?mode=rwc
 JWT_SECRET=your-secret-key
@@ -139,4 +88,4 @@ PORT=3000
 
 ## License
 
-GPL-3.0 - See [LICENSE](LICENSE) for details.
+[GPL-3.0](LICENSE)
