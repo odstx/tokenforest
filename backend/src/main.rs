@@ -63,11 +63,42 @@ mod crypto;
 )]
 struct ApiDoc;
 
+fn check_required_env_vars() {
+    let required_vars = ["JWT_SECRET", "ENCRYPTION_KEY"];
+    let missing: Vec<&str> = required_vars
+        .iter()
+        .filter(|var| std::env::var(var).is_err())
+        .copied()
+        .collect();
+    
+    if !missing.is_empty() {
+        eprintln!("\n❌ Missing required environment variables:\n");
+        for var in &missing {
+            eprintln!("   - {}", var);
+        }
+        eprintln!("\n📝 Please set them in one of the following ways:\n");
+        eprintln!("   1. Create a .dev.env file in the project root with:");
+        for var in &missing {
+            eprintln!("      {}=your-value-here", var);
+        }
+        eprintln!("\n   2. Or set them directly in your shell:");
+        for var in &missing {
+            eprintln!("      export {}=your-value-here", var);
+        }
+        eprintln!("\n   Example values:");
+        eprintln!("      JWT_SECRET=your-secret-key-at-least-32-characters-long");
+        eprintln!("      ENCRYPTION_KEY=your-encryption-key-at-least-32-characters\n");
+        std::process::exit(1);
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let run_mode = std::env::var("RUN_MODE").unwrap_or_else(|_| "dev".to_string());
     let env_file = format!(".{}.env", run_mode);
     dotenvy::from_path_override(&env_file).ok();
+    
+    check_required_env_vars();
 
     tracing_subscriber::registry()
         .with(

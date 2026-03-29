@@ -416,6 +416,7 @@
           <span class="label-text">{$_('tokenPools.modal.modelType')}</span>
         </label>
         <ModelDropdown
+          id="pool-model"
           selectedModel={formData.model_type}
           placeholder={$_('tokenPools.modal.selectModel')}
           searchPlaceholder={$_('tokenPools.modal.searchModels')}

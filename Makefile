@@ -4,6 +4,8 @@
 .PHONY: help dev dev-backend dev-core dev-frontend build build-backend build-frontend clean install-backend install-frontend test test-backend test-frontend test-ui kill-all
 
 CARGO := $(HOME)/.cargo/bin/cargo
+JWT_SECRET := dev-secret-key-change-in-production-32chars
+ENCRYPTION_KEY := dev-encryption-key-change-in-production
 
 # Kill process on a specific port
 kill-port = @lsof -ti:$(1) | xargs kill -9 2>/dev/null || true
@@ -50,11 +52,11 @@ dev:
 	@echo "Press Ctrl+C to stop all servers"
 	@echo ""
 	# Start backend in background
-	cd backend && RUN_MODE=dev $(CARGO) run &
+	cd backend && RUN_MODE=dev JWT_SECRET=$(JWT_SECRET) ENCRYPTION_KEY=$(ENCRYPTION_KEY) $(CARGO) run &
 	# Wait for backend to start
 	sleep 2
 	# Start core in background
-	cd backend && RUN_MODE=dev $(CARGO) run --bin tokenforest_core &
+	cd backend && RUN_MODE=dev JWT_SECRET=$(JWT_SECRET) ENCRYPTION_KEY=$(ENCRYPTION_KEY) $(CARGO) run --bin tokenforest_core &
 	# Wait for core to start
 	sleep 1
 	# Start frontend
@@ -68,14 +70,14 @@ dev-backend:
 	@echo "🔪 Killing existing process on port 3000..."
 	@lsof -ti:3000 | xargs kill -9 2>/dev/null || true
 	@echo "🦀 Starting backend server..."
-	cd backend && RUN_MODE=dev $(CARGO) run
+	cd backend && RUN_MODE=dev JWT_SECRET=$(JWT_SECRET) ENCRYPTION_KEY=$(ENCRYPTION_KEY) $(CARGO) run
 
 # Start core server only
 dev-core:
 	@echo "🔪 Killing existing process on port 8000..."
 	@lsof -ti:8000 | xargs kill -9 2>/dev/null || true
 	@echo "🔧 Starting core server..."
-	cd backend && RUN_MODE=dev $(CARGO) run --bin tokenforest_core
+	cd backend && RUN_MODE=dev JWT_SECRET=$(JWT_SECRET) ENCRYPTION_KEY=$(ENCRYPTION_KEY) $(CARGO) run --bin tokenforest_core
 
 # Start frontend only
 dev-frontend:
@@ -118,7 +120,19 @@ clean:
 # Run Playwright tests
 test:
 	@echo "🧪 Running Playwright tests..."
-	cd frontend && RUN_MODE=test bunx playwright test
+	@echo "🔪 Killing existing processes on ports 3000, 8000, 5173..."
+	@lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+	@lsof -ti:8000 | xargs kill -9 2>/dev/null || true
+	@lsof -ti:5173 | xargs kill -9 2>/dev/null || true
+	@echo "🦀 Starting backend server..."
+	cd backend && RUN_MODE=test JWT_SECRET=$(JWT_SECRET) ENCRYPTION_KEY=$(ENCRYPTION_KEY) $(CARGO) run &
+	@echo "⏳ Waiting for backend to start..."
+	@sleep 5
+	cd frontend && RUN_MODE=test JWT_SECRET=$(JWT_SECRET) ENCRYPTION_KEY=$(ENCRYPTION_KEY) bunx playwright test; \
+	RET=$$?; \
+	echo "🛑 Stopping backend..."; \
+	lsof -ti:3000 | xargs kill -9 2>/dev/null || true; \
+	exit $$RET
 
 # Run backend unit tests
 test-backend:
@@ -133,4 +147,16 @@ test-frontend:
 # Run Playwright tests with UI
 test-ui:
 	@echo "🧪 Running Playwright tests with UI..."
-	cd frontend && RUN_MODE=test bunx playwright test --ui
+	@echo "🔪 Killing existing processes on ports 3000, 8000, 5173..."
+	@lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+	@lsof -ti:8000 | xargs kill -9 2>/dev/null || true
+	@lsof -ti:5173 | xargs kill -9 2>/dev/null || true
+	@echo "🦀 Starting backend server..."
+	cd backend && RUN_MODE=test JWT_SECRET=$(JWT_SECRET) ENCRYPTION_KEY=$(ENCRYPTION_KEY) $(CARGO) run &
+	@echo "⏳ Waiting for backend to start..."
+	@sleep 5
+	cd frontend && RUN_MODE=test JWT_SECRET=$(JWT_SECRET) ENCRYPTION_KEY=$(ENCRYPTION_KEY) bunx playwright test --ui; \
+	RET=$$?; \
+	echo "🛑 Stopping backend..."; \
+	lsof -ti:3000 | xargs kill -9 2>/dev/null || true; \
+	exit $$RET
