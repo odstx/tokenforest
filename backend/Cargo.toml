@@ -46,7 +46,10 @@ rand = "0.8"
 aes-gcm = "0.10"
 base64 = "0.22"
 sha2 = "0.10"
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.11", features = ["json", "stream"] }
+tokio-stream = "0.1"
+futures-util = "0.3"
+http-body = "1.0"
 prometheus = "0.13"
 lazy_static = "1.4"
 ipnetwork = "0.20"

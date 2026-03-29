@@ -20,6 +20,7 @@ pub struct ApiKey {
     pub prefix: String,
     pub is_active: i32,
     pub allowed_cidrs: Option<String>,
+    pub key_encrypted: Option<String>,
     pub last_used_at: Option<String>,
     pub created_at: String,
 }

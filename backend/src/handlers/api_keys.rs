@@ -4,11 +4,13 @@ use axum::{
     response::Json,
 };
 use bcrypt::{hash, DEFAULT_COST};
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::auth::CurrentUser;
 use crate::crypto;
 use crate::models::{ApiKey, ApiKeyResponse, CreateApiKeyRequest, CreateApiKeyResponse, PaginatedResponse, PaginationQuery, TokenPool, UpdateApiKeyRequest};
-use super::{AppPool, ErrorResponse, TestTokenPoolResponse};
+use super::{AppPool, ChatMessage, ErrorResponse, TestTokenPoolResponse};
 
 fn generate_api_key() -> String {
     use rand::Rng;
@@ -154,8 +156,9 @@ pub async fn create_api_key(
     }
 
     let raw_key = generate_api_key();
+    let full_key = format!("tf-{}", raw_key);
     let prefix = format!("tf-{}", &raw_key[..8]);
-    let key_hash = hash(&raw_key, DEFAULT_COST).map_err(|_| {
+    let key_hash = hash(&full_key, DEFAULT_COST).map_err(|_| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {
@@ -164,10 +167,19 @@ pub async fn create_api_key(
         )
     })?;
 
+    let key_encrypted = crypto::encrypt(&full_key).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: format!("Failed to encrypt API key: {}", e),
+            }),
+        )
+    })?;
+
     let allowed_cidrs_json = payload.allowed_cidrs.as_ref().map(|v| serde_json::to_string(v).unwrap_or_default());
 
     let result = sqlx::query(
-        "INSERT INTO api_keys (user_id, name, model, key_hash, prefix, is_active, allowed_cidrs, created_at) VALUES (?, ?, ?, ?, ?, 1, ?, datetime('now'))"
+        "INSERT INTO api_keys (user_id, name, model, key_hash, prefix, is_active, allowed_cidrs, key_encrypted, created_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, datetime('now'))"
     )
     .bind(claims.sub)
     .bind(&payload.name)
@@ -175,6 +187,7 @@ pub async fn create_api_key(
     .bind(&key_hash)
     .bind(&prefix)
     .bind(&allowed_cidrs_json)
+    .bind(&key_encrypted)
     .execute(&pool)
     .await
     .map_err(|_| {
@@ -193,6 +206,61 @@ pub async fn create_api_key(
         key: format!("tf-{}", raw_key),
         prefix,
         allowed_cidrs: payload.allowed_cidrs,
+    }))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/api-keys/{id}",
+    responses(
+        (status = 200, description = "API key details", body = ApiKeyResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "API key not found", body = ErrorResponse)
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn get_api_key(
+    State(pool): State<AppPool>,
+    CurrentUser(claims): CurrentUser,
+    Path(id): Path<i64>,
+) -> Result<Json<ApiKeyResponse>, (StatusCode, Json<ErrorResponse>)> {
+    let key = sqlx::query_as::<_, ApiKey>(
+        "SELECT * FROM api_keys WHERE id = ? AND user_id = ?"
+    )
+    .bind(id)
+    .bind(claims.sub)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: "Failed to fetch API key".to_string(),
+            }),
+        )
+    })?;
+
+    let key = key.ok_or((
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+            error: "API key not found".to_string(),
+        }),
+    ))?;
+
+    let allowed_cidrs: Option<Vec<String>> = key.allowed_cidrs
+        .and_then(|s| serde_json::from_str(&s).ok());
+
+    Ok(Json(ApiKeyResponse {
+        id: key.id,
+        name: key.name,
+        model: key.model,
+        prefix: key.prefix,
+        is_active: key.is_active != 0,
+        allowed_cidrs,
+        last_used_at: key.last_used_at,
+        created_at: key.created_at,
     }))
 }
 
@@ -473,7 +541,7 @@ pub async fn test_api_key(
 
     let base_url = token_pool.base_url.clone();
     let test_url = build_test_url(&token_pool.base_url);
-    let chat_request = build_test_chat_request(&token_pool.model_type, "你是谁 你支持什么功能");
+    let chat_request = build_test_chat_request(&token_pool.model_type, "Say hello in one word");
 
     let client = reqwest::Client::new();
     let response = client
@@ -519,6 +587,170 @@ pub async fn test_api_key(
                 success: false,
                 message,
                 response_content: None,
+            }))
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct RawKeyResponse {
+    pub key: String,
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/api-keys/{id}/key",
+    responses(
+        (status = 200, description = "Raw API key", body = RawKeyResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "API key not found", body = ErrorResponse)
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn get_raw_api_key(
+    State(pool): State<AppPool>,
+    CurrentUser(claims): CurrentUser,
+    Path(id): Path<i64>,
+) -> Result<Json<RawKeyResponse>, (StatusCode, Json<ErrorResponse>)> {
+    let key = sqlx::query_as::<_, ApiKey>(
+        "SELECT * FROM api_keys WHERE id = ? AND user_id = ?"
+    )
+    .bind(id)
+    .bind(claims.sub)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: "Failed to fetch API key".to_string(),
+            }),
+        )
+    })?;
+
+    let key = key.ok_or((
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+            error: "API key not found".to_string(),
+        }),
+    ))?;
+
+    let key_encrypted = key.key_encrypted.ok_or((
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+            error: "API key has no stored key value".to_string(),
+        }),
+    ))?;
+
+    let raw_key = crypto::decrypt(&key_encrypted).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: format!("Failed to decrypt API key: {}", e),
+            }),
+        )
+    })?;
+
+    Ok(Json(RawKeyResponse { key: raw_key }))
+}
+
+#[derive(Deserialize, Serialize, ToSchema)]
+pub struct ApiKeyChatRequest {
+    pub api_key: String,
+    pub base_url: String,
+    pub model: String,
+    pub messages: Vec<ChatMessage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tokens: Option<i32>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct ApiKeyChatResponse {
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/api-keys/chat",
+    request_body = ApiKeyChatRequest,
+    responses(
+        (status = 200, description = "Chat response", body = ApiKeyChatResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn chat_with_api_key(
+    _user: CurrentUser,
+    Json(payload): Json<ApiKeyChatRequest>,
+) -> Result<Json<ApiKeyChatResponse>, (StatusCode, Json<ErrorResponse>)> {
+    let chat_url = build_test_url(&payload.base_url);
+    
+    let mut chat_body = serde_json::json!({
+        "model": payload.model,
+        "messages": payload.messages,
+    });
+    
+    if let Some(max_tokens) = payload.max_tokens {
+        chat_body["max_tokens"] = serde_json::json!(max_tokens);
+    }
+    
+    let client = reqwest::Client::new();
+    let response = client
+        .post(&chat_url)
+        .header("Authorization", format!("Bearer {}", payload.api_key))
+        .header("Content-Type", "application/json")
+        .json(&chat_body)
+        .timeout(std::time::Duration::from_secs(60))
+        .send()
+        .await;
+
+    match response {
+        Ok(resp) => {
+            let status = resp.status().as_u16();
+            let body = resp.json::<serde_json::Value>().await.unwrap_or(serde_json::json!({}));
+            
+            if (200..300).contains(&status) {
+                if let Some(content) = extract_response_content(&body) {
+                    Ok(Json(ApiKeyChatResponse {
+                        success: true,
+                        content: Some(content),
+                        error: None,
+                    }))
+                } else {
+                    Ok(Json(ApiKeyChatResponse {
+                        success: false,
+                        content: None,
+                        error: Some("No content in response".to_string()),
+                    }))
+                }
+            } else {
+                let error_msg = extract_error_message(&body, status);
+                Ok(Json(ApiKeyChatResponse {
+                    success: false,
+                    content: None,
+                    error: Some(error_msg),
+                }))
+            }
+        }
+        Err(e) => {
+            let error_msg = if e.is_timeout() {
+                "Connection timed out".to_string()
+            } else if e.is_connect() {
+                format!("Failed to connect to {}: {}", payload.base_url, e)
+            } else {
+                format!("Connection failed: {}", e)
+            };
+            Ok(Json(ApiKeyChatResponse {
+                success: false,
+                content: None,
+                error: Some(error_msg),
             }))
         }
     }
@@ -605,5 +837,81 @@ mod tests {
             "error": {}
         });
         assert_eq!(extract_error_message(&body, 403), "API returned status code: 403");
+    }
+
+    #[test]
+    fn test_api_key_chat_request_serialization() {
+        let request = ApiKeyChatRequest {
+            api_key: "test-key".to_string(),
+            base_url: "https://api.example.com".to_string(),
+            model: "gpt-4".to_string(),
+            messages: vec![ChatMessage {
+                role: "user".to_string(),
+                content: "Hello".to_string(),
+            }],
+            max_tokens: Some(1000),
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        assert!(json.contains("\"api_key\":\"test-key\""));
+        assert!(json.contains("\"base_url\":\"https://api.example.com\""));
+        assert!(json.contains("\"model\":\"gpt-4\""));
+        assert!(json.contains("\"max_tokens\":1000"));
+    }
+
+    #[test]
+    fn test_api_key_chat_request_without_max_tokens() {
+        let request = ApiKeyChatRequest {
+            api_key: "test-key".to_string(),
+            base_url: "https://api.example.com".to_string(),
+            model: "gpt-4".to_string(),
+            messages: vec![],
+            max_tokens: None,
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        assert!(!json.contains("max_tokens"));
+    }
+
+    #[test]
+    fn test_api_key_chat_request_deserialization() {
+        let json = r#"{"api_key":"my-key","base_url":"http://localhost:8000","model":"deepseek-chat","messages":[{"role":"user","content":"hi"}],"max_tokens":500}"#;
+        let request: ApiKeyChatRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(request.api_key, "my-key");
+        assert_eq!(request.base_url, "http://localhost:8000");
+        assert_eq!(request.model, "deepseek-chat");
+        assert_eq!(request.messages.len(), 1);
+        assert_eq!(request.max_tokens, Some(500));
+    }
+
+    #[test]
+    fn test_api_key_chat_response_success_serialization() {
+        let response = ApiKeyChatResponse {
+            success: true,
+            content: Some("Hello back!".to_string()),
+            error: None,
+        };
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"success\":true"));
+        assert!(json.contains("\"content\":\"Hello back!\""));
+    }
+
+    #[test]
+    fn test_api_key_chat_response_error_serialization() {
+        let response = ApiKeyChatResponse {
+            success: false,
+            content: None,
+            error: Some("Connection failed".to_string()),
+        };
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"success\":false"));
+        assert!(json.contains("\"error\":\"Connection failed\""));
+    }
+
+    #[test]
+    fn test_api_key_chat_response_deserialization() {
+        let json = r#"{"success":true,"content":"Test response","error":null}"#;
+        let response: ApiKeyChatResponse = serde_json::from_str(json).unwrap();
+        assert!(response.success);
+        assert_eq!(response.content, Some("Test response".to_string()));
+        assert_eq!(response.error, None);
     }
 }

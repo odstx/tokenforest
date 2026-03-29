@@ -2,12 +2,13 @@ use axum::{
     routing::{get, post},
     Router,
     extract::DefaultBodyLimit,
-    http::{StatusCode, header},
+    http::{StatusCode, header, Method, Uri},
     response::IntoResponse,
 };
 use sqlx::sqlite::SqlitePool;
 use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tower_http::cors::{Any, CorsLayer};
 
 use tokenforest_backend::core::metrics;
 use tokenforest_backend::core::proxy::{chat_completions, completions, embeddings};
@@ -37,6 +38,11 @@ async fn main() -> anyhow::Result<()> {
 
     db::migrate(&pool).await?;
 
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
     let app = Router::new()
         .route("/health", get(health))
         .route("/metrics", get(metrics_handler))
@@ -44,6 +50,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/completions", post(completions))
         .route("/v1/embeddings", post(embeddings))
         .route("/v1/models", get(models_list))
+        .layer(cors)
         .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
         .with_state(pool);
 

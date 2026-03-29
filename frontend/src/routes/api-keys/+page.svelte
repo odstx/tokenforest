@@ -86,6 +86,14 @@
     }
   }
 
+  function handleChatAction() {
+    const keyId = actionDropdownOpen;
+    if (keyId !== null) {
+      closeActionDropdown();
+      goto(`/chat?type=api-key&id=${keyId}`);
+    }
+  }
+
   function getActionKey() {
     return apiKeys.find(k => k.id === actionDropdownOpen);
   }
@@ -558,6 +566,11 @@
       <li>
         <button on:click={handleTestAction}>
           {$_('apiKeys.actions.test')}
+        </button>
+      </li>
+      <li>
+        <button on:click={handleChatAction}>
+          {$_('apiKeys.actions.chat')}
         </button>
       </li>
       <li>

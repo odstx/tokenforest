@@ -105,11 +105,44 @@ mod tests {
     #[test]
     fn test_decrypt_too_short() {
         setup_test_key();
-        let short_input = BASE64.encode(&[0u8; 5]);
+        let short_input = BASE64.encode([0u8; 5]);
         let result = decrypt(&short_input);
         assert!(
             result.is_err(),
             "Should fail on data too short to contain nonce"
         );
+    }
+}
+
+#[cfg(test)]
+mod encrypt_util {
+    use super::*;
+    use std::sync::Once;
+
+    static INIT: Once = Once::new();
+
+    #[test]
+    #[ignore]
+    fn print_encrypted_deepseek_key() {
+        INIT.call_once(|| {
+            std::env::set_var("ENCRYPTION_KEY", "dev-encryption-key-change-in-production");
+        });
+        let api_key = "sk-21bb2908dcb7437bb0986e08b2a6fa48";
+        let encrypted = encrypt(api_key).unwrap();
+        eprintln!("ENCRYPTED_KEY: {}", encrypted);
+        panic!("Encrypted key output");
+    }
+
+    #[test]
+    #[ignore]
+    fn decrypt_test3_key() {
+        INIT.call_once(|| {
+            std::env::set_var("ENCRYPTION_KEY", "dev-encryption-key-change-in-production");
+        });
+        let encrypted =
+            "ISECJfpzW7t5b030jVMPxuv8f6wEuEIWdgUDSPg6OIEmZkwqX/Yl+T52FAEk96QvaHz27leN3Bymm84unebY";
+        let decrypted = decrypt(encrypted).unwrap();
+        eprintln!("DECRYPTED_KEY: {}", decrypted);
+        panic!("Decrypted key output");
     }
 }

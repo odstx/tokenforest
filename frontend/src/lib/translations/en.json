@@ -57,6 +57,7 @@
       "disable": "Disable",
       "edit": "Edit",
       "test": "Test",
+      "chat": "Chat",
       "delete": "Delete"
     },
     "lastUsed": {
@@ -116,6 +117,7 @@
     "actions": {
       "edit": "Edit",
       "test": "Test",
+      "chat": "Chat",
       "enable": "Enable",
       "disable": "Disable",
       "delete": "Delete"
@@ -158,6 +160,19 @@
     "createFailed": "Failed to create API key",
     "deleteFailed": "Failed to delete API key",
     "toggleFailed": "Failed to toggle API key"
+  },
+  "chat": {
+    "title": "Chat",
+    "usingKey": "Using: {name}",
+    "usingPool": "Using Pool: {name}",
+    "placeholder": "Type your message...",
+    "apiKeyPlaceholder": "Enter your API key to chat...",
+    "send": "Send",
+    "sending": "Sending...",
+    "error": "Failed to send message",
+    "noMessages": "No messages yet. Start a conversation!",
+    "back": "Back",
+    "clear": "Clear Chat"
   },
   "language": {
     "en": "English",

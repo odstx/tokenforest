@@ -57,6 +57,7 @@
       "disable": "禁用",
       "edit": "编辑",
       "test": "测试",
+      "chat": "聊天",
       "delete": "删除"
     },
     "lastUsed": {
@@ -116,6 +117,7 @@
     "actions": {
       "edit": "编辑",
       "test": "测试",
+      "chat": "聊天",
       "enable": "启用",
       "disable": "禁用",
       "delete": "删除"
@@ -158,6 +160,19 @@
     "createFailed": "创建 API 密钥失败",
     "deleteFailed": "删除 API 密钥失败",
     "toggleFailed": "切换 API 密钥状态失败"
+  },
+  "chat": {
+    "title": "聊天",
+    "usingKey": "使用密钥: {name}",
+    "usingPool": "使用Token池: {name}",
+    "placeholder": "输入您的消息...",
+    "apiKeyPlaceholder": "输入您的 API 密钥开始聊天...",
+    "send": "发送",
+    "sending": "发送中...",
+    "error": "发送消息失败",
+    "noMessages": "暂无消息，开始对话吧！",
+    "back": "返回",
+    "clear": "清空聊天"
   },
   "language": {
     "en": "English",

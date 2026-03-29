@@ -3,7 +3,7 @@ use axum::{
     http::StatusCode,
     response::Json,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::auth::CurrentUser;
@@ -21,6 +21,29 @@ pub struct TestTokenPoolResponse {
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_content: Option<String>,
+}
+
+#[derive(Deserialize, Serialize, ToSchema)]
+pub struct ChatRequest {
+    pub model: String,
+    pub messages: Vec<ChatMessage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tokens: Option<i32>,
+}
+
+#[derive(Deserialize, Serialize, ToSchema)]
+pub struct ChatMessage {
+    pub role: String,
+    pub content: String,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct ChatResponse {
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 #[utoipa::path(
@@ -179,6 +202,49 @@ pub async fn create_token_pool(
         created_at: created.created_at,
         updated_at: created.updated_at,
     }))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/token-pools/{id}",
+    responses(
+        (status = 200, description = "Token pool details", body = TokenPoolResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Token pool not found", body = ErrorResponse)
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn get_token_pool(
+    State(pool): State<AppPool>,
+    CurrentUser(claims): CurrentUser,
+    Path(id): Path<i64>,
+) -> Result<Json<TokenPoolResponse>, (StatusCode, Json<ErrorResponse>)> {
+    let pool_item = sqlx::query_as::<_, TokenPool>(
+        "SELECT * FROM token_pools WHERE id = ? AND user_id = ?"
+    )
+    .bind(id)
+    .bind(claims.sub)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: "Failed to fetch token pool".to_string(),
+            }),
+        )
+    })?;
+
+    let pool_item = pool_item.ok_or((
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+            error: "Token pool not found".to_string(),
+        }),
+    ))?;
+
+    Ok(Json(TokenPoolResponse::from(pool_item)))
 }
 
 #[utoipa::path(
@@ -508,5 +574,193 @@ pub async fn test_token_pool(
                 response_content: None,
             }))
         }
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/token-pools/{id}/chat",
+    request_body = ChatRequest,
+    responses(
+        (status = 200, description = "Chat response", body = ChatResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Token pool not found", body = ErrorResponse)
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn chat_with_token_pool(
+    State(pool): State<AppPool>,
+    CurrentUser(claims): CurrentUser,
+    Path(id): Path<i64>,
+    Json(request): Json<ChatRequest>,
+) -> Result<Json<ChatResponse>, (StatusCode, Json<ErrorResponse>)> {
+    let pool_item = sqlx::query_as::<_, TokenPool>(
+        "SELECT * FROM token_pools WHERE id = ? AND user_id = ?"
+    )
+    .bind(id)
+    .bind(claims.sub)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: "Failed to fetch token pool".to_string(),
+            }),
+        )
+    })?;
+
+    let pool_item = pool_item.ok_or((
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+            error: "Token pool not found".to_string(),
+        }),
+    ))?;
+
+    let api_key = crypto::decrypt(&pool_item.api_key_encrypted).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: format!("Failed to decrypt API key: {}", e),
+            }),
+        )
+    })?;
+
+    let base_url = pool_item.base_url.trim_end_matches('/');
+    let chat_url = format!("{}/v1/chat/completions", base_url);
+
+    let chat_request = serde_json::json!({
+        "model": pool_item.model_type,
+        "messages": request.messages,
+        "max_tokens": request.max_tokens.unwrap_or(1000)
+    });
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(&chat_url)
+        .header("Authorization", format!("Bearer {}", api_key))
+        .header("Content-Type", "application/json")
+        .json(&chat_request)
+        .timeout(std::time::Duration::from_secs(60))
+        .send()
+        .await;
+
+    match response {
+        Ok(resp) => {
+            if resp.status().is_success() {
+                let body: serde_json::Value = resp.json().await.unwrap_or(serde_json::json!({}));
+                let content = body["choices"][0]["message"]["content"]
+                    .as_str()
+                    .map(|s| s.to_string());
+
+                Ok(Json(ChatResponse {
+                    success: true,
+                    content,
+                    error: None,
+                }))
+            } else {
+                let status = resp.status().as_u16();
+                let error_body: serde_json::Value = resp.json().await.unwrap_or(serde_json::json!({}));
+                let error_msg = error_body["error"]["message"]
+                    .as_str()
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| format!("API returned status code: {}", status));
+                Ok(Json(ChatResponse {
+                    success: false,
+                    content: None,
+                    error: Some(error_msg),
+                }))
+            }
+        }
+        Err(e) => {
+            let message = if e.is_timeout() {
+                "Connection timed out".to_string()
+            } else if e.is_connect() {
+                format!("Failed to connect to {}: {}", base_url, e)
+            } else {
+                format!("Connection failed: {}", e)
+            };
+            Ok(Json(ChatResponse {
+                success: false,
+                content: None,
+                error: Some(message),
+            }))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_chat_request_serialization() {
+        let request = ChatRequest {
+            model: "gpt-4".to_string(),
+            messages: vec![ChatMessage {
+                role: "user".to_string(),
+                content: "Hello".to_string(),
+            }],
+            max_tokens: None,
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        assert!(json.contains("\"model\":\"gpt-4\""));
+        assert!(json.contains("\"role\":\"user\""));
+        assert!(json.contains("\"content\":\"Hello\""));
+    }
+
+    #[test]
+    fn test_chat_response_success_serialization() {
+        let response = ChatResponse {
+            success: true,
+            content: Some("Hello, world!".to_string()),
+            error: None,
+        };
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"success\":true"));
+        assert!(json.contains("\"content\":\"Hello, world!\""));
+    }
+
+    #[test]
+    fn test_chat_response_error_serialization() {
+        let response = ChatResponse {
+            success: false,
+            content: None,
+            error: Some("Connection failed".to_string()),
+        };
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"success\":false"));
+        assert!(json.contains("\"error\":\"Connection failed\""));
+    }
+
+    #[test]
+    fn test_chat_message_serialization() {
+        let message = ChatMessage {
+            role: "assistant".to_string(),
+            content: "Response text".to_string(),
+        };
+        let json = serde_json::to_string(&message).unwrap();
+        assert_eq!(json, r#"{"role":"assistant","content":"Response text"}"#);
+    }
+
+    #[test]
+    fn test_chat_request_deserialization() {
+        let json = r#"{"model":"gpt-3.5-turbo","messages":[{"role":"user","content":"Test"}]}"#;
+        let request: ChatRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(request.model, "gpt-3.5-turbo");
+        assert_eq!(request.messages.len(), 1);
+        assert_eq!(request.messages[0].role, "user");
+        assert_eq!(request.messages[0].content, "Test");
+    }
+
+    #[test]
+    fn test_chat_response_deserialization() {
+        let json = r#"{"success":true,"content":"Test response","error":null}"#;
+        let response: ChatResponse = serde_json::from_str(json).unwrap();
+        assert!(response.success);
+        assert_eq!(response.content, Some("Test response".to_string()));
+        assert_eq!(response.error, None);
     }
 }

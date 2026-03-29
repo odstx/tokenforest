@@ -50,8 +50,7 @@ pub fn is_valid_api_key_format(api_key: &str) -> bool {
 }
 
 pub fn verify_api_key(api_key: &str, key_hash: &str) -> bool {
-    let key_without_prefix = api_key.strip_prefix("tf-").unwrap_or(api_key);
-    verify(key_without_prefix, key_hash).unwrap_or(false)
+    verify(api_key, key_hash).unwrap_or(false)
 }
 
 pub fn hash_api_key(api_key: &str) -> Result<String, String> {
@@ -115,9 +114,19 @@ impl FromRequestParts<SqlitePool> for CoreAuth
 
         let pool = pool.clone();
 
+        let key_prefix = if api_key.len() >= 11 {
+            format!("tf-{}", &api_key[3..11])
+        } else {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                Json(CoreAuthError::unauthorized("Invalid API key format")),
+            ));
+        };
+
         let api_keys = sqlx::query_as::<_, ApiKey>(
-            "SELECT * FROM api_keys WHERE is_active = 1"
+            "SELECT * FROM api_keys WHERE is_active = 1 AND prefix = ?"
         )
+        .bind(&key_prefix)
         .fetch_all(&pool)
         .await
         .map_err(|_| {
@@ -219,14 +228,15 @@ mod tests {
     #[test]
     fn test_hash_and_verify_api_key() {
         let raw_key = "test-key-12345";
-        let hashed = hash_api_key(raw_key).expect("Hashing should succeed");
+        let full_key = format!("tf-{}", raw_key);
+        let hashed = hash_api_key(&full_key).expect("Hashing should succeed");
 
-        assert_ne!(raw_key, hashed, "Hash should differ from original");
+        assert_ne!(full_key, hashed, "Hash should differ from original");
         assert!(hashed.starts_with("$2b$"), "Should be bcrypt format");
 
         assert!(
-            verify_api_key(&format!("tf-{}", raw_key), &hashed),
-            "Should verify correct key with tf- prefix"
+            verify_api_key(&full_key, &hashed),
+            "Should verify correct key"
         );
         assert!(!verify_api_key("tf-wrong-key", &hashed), "Should reject wrong key");
     }

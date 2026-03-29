@@ -5,6 +5,7 @@ use axum::{
     response::Response,
     Json,
 };
+use futures_util::StreamExt;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
@@ -14,6 +15,21 @@ use super::metrics;
 use crate::crypto;
 
 use crate::models::TokenPool;
+
+static CLIENT: std::sync::OnceLock<Client> = std::sync::OnceLock::new();
+
+fn get_client() -> &'static Client {
+    CLIENT.get_or_init(|| {
+        Client::builder()
+            .timeout(std::time::Duration::from_secs(300))
+            .pool_idle_timeout(std::time::Duration::from_secs(90))
+            .pool_max_idle_per_host(10)
+            .tcp_nodelay(true)
+            .tcp_keepalive(std::time::Duration::from_secs(60))
+            .build()
+            .expect("Failed to create HTTP client")
+    })
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProxyError {
@@ -124,6 +140,8 @@ pub async fn proxy_to_token_pool(
     _headers: HeaderMap,
     body: Bytes,
 ) -> Result<Response<Body>, (StatusCode, Json<ProxyError>)> {
+    let start_time = std::time::Instant::now();
+    
     let model = api_key.model.as_ref().ok_or((
         StatusCode::BAD_REQUEST,
         Json(ProxyError::bad_request("API key has no model configured")),
@@ -152,9 +170,23 @@ pub async fn proxy_to_token_pool(
             model
         ))),
     ))?;
+    
+    tracing::info!("[TIMING] DB lookup took {:?}", start_time.elapsed());
+
+    tracing::debug!(
+        "Selected token pool ID: {}, name: {}, api_key_encrypted length: {}",
+        token_pool.id,
+        token_pool.name,
+        token_pool.api_key_encrypted.len()
+    );
 
     let decrypted_key = crypto::decrypt(&token_pool.api_key_encrypted).map_err(|e| {
-        tracing::error!("Failed to decrypt token pool API key: {}", e);
+        tracing::error!(
+            "Failed to decrypt token pool API key for pool ID {}: {}, encrypted value prefix: {:?}",
+            token_pool.id,
+            e,
+            &token_pool.api_key_encrypted.chars().take(20).collect::<String>()
+        );
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ProxyError::internal("Failed to decrypt token pool credentials")),
@@ -165,7 +197,7 @@ pub async fn proxy_to_token_pool(
 
     tracing::info!("Proxying {} {} -> {}", method, uri.path(), target_url);
 
-    let client = Client::new();
+    let client = get_client();
     let mut request_builder = match method {
         Method::GET => client.get(&target_url),
         Method::POST => client.post(&target_url),
@@ -196,9 +228,73 @@ pub async fn proxy_to_token_pool(
             Json(ProxyError::internal(&format!("Upstream request failed: {}", e))),
         )
     })?;
+    
+    tracing::info!("[TIMING] Upstream response headers received in {:?}", start_time.elapsed());
 
     let status = StatusCode::from_u16(response.status().as_u16()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
     let response_headers = response.headers().clone();
+
+    if is_stream {
+        let model = model.clone();
+        let api_key_id = api_key.id.to_string();
+        let (tx, rx) = tokio::sync::mpsc::channel::<Result<Bytes, std::io::Error>>(100);
+        let stream_start = start_time;
+        
+        let mut response_stream = response.bytes_stream();
+        let mut total_input = 0u64;
+        let mut total_output = 0u64;
+        let mut first_chunk_logged = false;
+        
+        tokio::spawn(async move {
+            while let Some(chunk_result) = response_stream.next().await {
+                match chunk_result {
+                    Ok(chunk) => {
+                        if !first_chunk_logged {
+                            tracing::info!("[TIMING] First chunk received at {:?}", stream_start.elapsed());
+                            first_chunk_logged = true;
+                        }
+                        let (input, output) = parse_stream_usage(&chunk);
+                        total_input += input;
+                        total_output += output;
+                        if tx.send(Ok(chunk)).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Stream error: {}", e);
+                        let _ = tx.send(Err(std::io::Error::other(e))).await;
+                        break;
+                    }
+                }
+            }
+            
+            tracing::info!("[TIMING] Stream completed in {:?}", stream_start.elapsed());
+            
+            if total_input > 0 || total_output > 0 {
+                metrics::record_tokens(&model, &api_key_id, total_input, total_output);
+            }
+            metrics::record_request(&model, &api_key_id, "success");
+        });
+
+        let stream = tokio_stream::wrappers::ReceiverStream::new(rx);
+        let body = Body::from_stream(stream);
+        
+        let mut builder = Response::builder().status(status);
+        for (name, value) in response_headers.iter() {
+            if name != "content-encoding" && name != "transfer-encoding" {
+                builder = builder.header(name.as_str(), value.as_bytes());
+            }
+        }
+        
+        return builder.body(body).map_err(|e| {
+            tracing::error!("Failed to build response: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ProxyError::internal("Failed to build response")),
+            )
+        });
+    }
+
     let response_body = response.bytes().await.map_err(|e| {
         tracing::error!("Failed to read upstream response: {}", e);
         metrics::record_request(model, &api_key.id.to_string(), "error");
@@ -209,11 +305,7 @@ pub async fn proxy_to_token_pool(
     })?;
 
     if status.is_success() {
-        let (input_tokens, output_tokens) = if is_stream {
-            parse_stream_usage(&response_body)
-        } else {
-            parse_non_stream_usage(&response_body)
-        };
+        let (input_tokens, output_tokens) = parse_non_stream_usage(&response_body);
         
         if input_tokens > 0 || output_tokens > 0 {
             metrics::record_tokens(model, &api_key.id.to_string(), input_tokens, output_tokens);

@@ -34,6 +34,10 @@ mod crypto;
         handlers::delete_token_pool,
         handlers::toggle_token_pool,
         handlers::test_token_pool,
+        handlers::chat_with_token_pool,
+        handlers::get_api_key,
+        handlers::get_raw_api_key,
+        handlers::get_token_pool,
         handlers::get_stats
     ),
     components(
@@ -52,7 +56,10 @@ mod crypto;
             handlers::UserInfo,
             handlers::ErrorResponse,
             handlers::TestTokenPoolResponse,
-            handlers::StatsResponse
+            handlers::ChatRequest,
+            handlers::ChatResponse,
+            handlers::StatsResponse,
+            handlers::RawKeyResponse
         )
     ),
     tags(
@@ -119,13 +126,16 @@ async fn main() -> anyhow::Result<()> {
     let protected_routes = Router::new()
         .route("/api/stats", get(handlers::get_stats))
         .route("/api/api-keys", get(handlers::list_api_keys).post(handlers::create_api_key))
-        .route("/api/api-keys/:id", put(handlers::update_api_key).delete(handlers::delete_api_key))
+        .route("/api/api-keys/chat", post(handlers::chat_with_api_key))
+        .route("/api/api-keys/:id/key", get(handlers::get_raw_api_key))
+        .route("/api/api-keys/:id", get(handlers::get_api_key).put(handlers::update_api_key).delete(handlers::delete_api_key))
         .route("/api/api-keys/:id/toggle", put(handlers::toggle_api_key))
         .route("/api/api-keys/:id/test", post(handlers::test_api_key))
         .route("/api/token-pools", get(handlers::list_token_pools).post(handlers::create_token_pool))
-        .route("/api/token-pools/:id", put(handlers::update_token_pool).delete(handlers::delete_token_pool))
+        .route("/api/token-pools/:id", get(handlers::get_token_pool).put(handlers::update_token_pool).delete(handlers::delete_token_pool))
         .route("/api/token-pools/:id/toggle", put(handlers::toggle_token_pool))
         .route("/api/token-pools/:id/test", post(handlers::test_token_pool))
+        .route("/api/token-pools/:id/chat", post(handlers::chat_with_token_pool))
         .route_layer(middleware::from_fn(auth::auth_middleware));
 
     let cors = CorsLayer::new()

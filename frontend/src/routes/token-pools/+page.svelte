@@ -78,6 +78,14 @@
     }
   }
 
+  function handleChatAction() {
+    const poolId = actionDropdownOpen;
+    if (poolId !== null) {
+      closeActionDropdown();
+      goto(`/chat?type=token-pool&id=${poolId}`);
+    }
+  }
+
   function handleToggleAction() {
     const poolId = actionDropdownOpen;
     if (poolId !== null) {
@@ -486,6 +494,11 @@
           disabled={testingId === actionDropdownOpen}
         >
           {testingId === actionDropdownOpen ? $_('tokenPools.test.testing') : $_('tokenPools.actions.test')}
+        </button>
+      </li>
+      <li>
+        <button on:click={handleChatAction}>
+          {$_('tokenPools.actions.chat')}
         </button>
       </li>
       <li>
