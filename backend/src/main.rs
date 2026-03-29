@@ -121,6 +121,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/api-keys", get(handlers::list_api_keys).post(handlers::create_api_key))
         .route("/api/api-keys/:id", put(handlers::update_api_key).delete(handlers::delete_api_key))
         .route("/api/api-keys/:id/toggle", put(handlers::toggle_api_key))
+        .route("/api/api-keys/:id/test", post(handlers::test_api_key))
         .route("/api/token-pools", get(handlers::list_token_pools).post(handlers::create_token_pool))
         .route("/api/token-pools/:id", put(handlers::update_token_pool).delete(handlers::delete_token_pool))
         .route("/api/token-pools/:id/toggle", put(handlers::toggle_token_pool))

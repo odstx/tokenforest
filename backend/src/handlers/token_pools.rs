@@ -444,7 +444,7 @@ pub async fn test_token_pool(
     let base_url = pool_item.base_url.trim_end_matches('/');
     let test_url = format!("{}/v1/chat/completions", base_url);
 
-    let test_prompt = "你是谁 你支持什么国内功能";
+    let test_prompt = "你是谁 你支持什么功能";
 
     let chat_request = serde_json::json!({
         "model": pool_item.model_type,

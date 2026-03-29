@@ -56,6 +56,7 @@
       "enable": "Enable",
       "disable": "Disable",
       "edit": "Edit",
+      "test": "Test",
       "delete": "Delete"
     },
     "lastUsed": {

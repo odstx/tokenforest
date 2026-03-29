@@ -43,6 +43,8 @@
   let editMode = false;
   let editingId: number | null = null;
   let savingKey = false;
+  let testingId: number | null = null;
+  let testResults: Map<number, { success: boolean; message: string }> = new Map();
 
   function selectModel(model: Model) {
     newKeyModel = model.id;
@@ -58,6 +60,14 @@
 
   function closeActionDropdown() {
     actionDropdownOpen = null;
+  }
+
+  function handleTestAction() {
+    const keyId = actionDropdownOpen;
+    if (keyId !== null) {
+      closeActionDropdown();
+      testKey(keyId);
+    }
   }
 
   function handleToggleAction() {
@@ -218,6 +228,38 @@
     }
   }
 
+  async function testKey(id: number) {
+    if (!browser) return;
+    
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    testingId = id;
+    testResults.delete(id);
+
+    try {
+      const response = await fetch(`/api/api-keys/${id}/test`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+      testResults.set(id, { 
+        success: data.success, 
+        message: data.message || (data.success ? 'Test successful' : 'Test failed')
+      });
+    } catch (err) {
+      testResults.set(id, { 
+        success: false, 
+        message: err instanceof Error ? err.message : 'Test failed'
+      });
+    } finally {
+      testingId = null;
+    }
+  }
+
   function addCidr() {
     const cidr = cidrInput.trim();
     if (cidr && !newKeyCidrs.includes(cidr)) {
@@ -359,6 +401,13 @@
                 <span class="badge {key.is_active ? 'badge-success' : 'badge-error'}">
                   {key.is_active ? $_('apiKeys.status.active') : $_('apiKeys.status.inactive')}
                 </span>
+                {#if testingId === key.id}
+                  <span class="loading loading-spinner loading-xs ml-2"></span>
+                {:else if testResults.has(key.id)}
+                  <span class="badge {testResults.get(key.id)?.success ? 'badge-success' : 'badge-error'} badge-sm ml-2">
+                    {testResults.get(key.id)?.success ? '✓' : '✗'}
+                  </span>
+                {/if}
               </td>
               <td class="whitespace-nowrap">{key.last_used_at || $_('apiKeys.lastUsed.never')}</td>
               <td class="whitespace-nowrap">{new Date(key.created_at).toLocaleDateString()}</td>
@@ -504,6 +553,11 @@
       <li>
         <button on:click={handleEditAction}>
           {$_('apiKeys.actions.edit')}
+        </button>
+      </li>
+      <li>
+        <button on:click={handleTestAction}>
+          {$_('apiKeys.actions.test')}
         </button>
       </li>
       <li>
