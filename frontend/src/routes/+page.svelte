@@ -20,7 +20,7 @@
     }
 
     try {
-      const res = await fetch('http://localhost:3000/api/stats', {
+      const res = await fetch('/api/stats', {
         headers: {
           'Authorization': `Bearer ${token}`
         }

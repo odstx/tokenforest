@@ -4,6 +4,9 @@
   import { browser } from '$app/environment';
   import { _ } from 'svelte-i18n';
   import { t } from '$lib/i18n';
+  import { commonModels, type Model } from '$lib/components/commonModels';
+  import ModelDropdown from '$lib/components/ModelDropdown.svelte';
+  import Pagination from '$lib/components/Pagination.svelte';
 
   interface ApiKey {
     id: number;
@@ -32,11 +35,6 @@
   let newKeyModel = '';
   let newKeyCidrs: string[] = [];
   let cidrInput = '';
-  let modelSearch = '';
-  let modelDropdownOpen = false;
-  let modelDropdownTop = 0;
-  let modelDropdownLeft = 0;
-  let modelDropdownWidth = 0;
   let actionDropdownOpen: number | null = null;
   let actionDropdownTop = 0;
   let actionDropdownLeft = 0;
@@ -46,53 +44,8 @@
   let editingId: number | null = null;
   let savingKey = false;
 
-  const commonModels = [
-    { id: 'gpt-4o', name: 'GPT-4o', provider: 'OpenAI' },
-    { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'OpenAI' },
-    { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', provider: 'OpenAI' },
-    { id: 'gpt-4', name: 'GPT-4', provider: 'OpenAI' },
-    { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', provider: 'OpenAI' },
-    { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', provider: 'Anthropic' },
-    { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', provider: 'Anthropic' },
-    { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus', provider: 'Anthropic' },
-    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', provider: 'Google' },
-    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', provider: 'Google' },
-    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', provider: 'Google' },
-    { id: 'llama-3.1-405b', name: 'Llama 3.1 405B', provider: 'Meta' },
-    { id: 'llama-3.1-70b', name: 'Llama 3.1 70B', provider: 'Meta' },
-    { id: 'llama-3.1-8b', name: 'Llama 3.1 8B', provider: 'Meta' },
-    { id: 'mistral-large', name: 'Mistral Large', provider: 'Mistral' },
-    { id: 'mistral-medium', name: 'Mistral Medium', provider: 'Mistral' },
-    { id: 'codestral-latest', name: 'Codestral', provider: 'Mistral' },
-    { id: 'deepseek-chat', name: 'DeepSeek Chat', provider: 'DeepSeek' },
-    { id: 'deepseek-coder', name: 'DeepSeek Coder', provider: 'DeepSeek' },
-  ];
-
-  $: filteredModels = commonModels.filter(m => 
-    m.name.toLowerCase().includes(modelSearch.toLowerCase()) ||
-    m.id.toLowerCase().includes(modelSearch.toLowerCase()) ||
-    m.provider.toLowerCase().includes(modelSearch.toLowerCase())
-  );
-
-  function selectModel(model: { id: string; name: string; provider: string }) {
+  function selectModel(model: Model) {
     newKeyModel = model.id;
-    modelDropdownOpen = false;
-    modelSearch = '';
-  }
-
-  function closeModelDropdown() {
-    modelDropdownOpen = false;
-    modelSearch = '';
-  }
-
-  function openModelDropdown(event: MouseEvent) {
-    const target = event.currentTarget as HTMLElement;
-    const rect = target.getBoundingClientRect();
-    modelDropdownTop = rect.bottom + 4;
-    modelDropdownLeft = rect.left;
-    modelDropdownWidth = rect.width;
-    modelDropdownOpen = true;
-    modelSearch = '';
   }
 
   function openActionDropdown(event: MouseEvent, keyId: number) {
@@ -335,8 +288,6 @@
     newKeyModel = '';
     newKeyCidrs = [];
     cidrInput = '';
-    modelSearch = '';
-    modelDropdownOpen = false;
   }
 
   function copyToClipboard(text: string) {
@@ -429,32 +380,7 @@
       </table>
     </div>
 
-    {#if totalPages > 1}
-      <div class="flex justify-center mt-4 join">
-        <button 
-          class="join-item btn" 
-          on:click={() => goToPage(page - 1)}
-          disabled={page <= 1}
-        >
-          «
-        </button>
-        {#each Array.from({ length: totalPages }, (_, i) => i + 1) as p}
-          <button 
-            class="join-item btn {p === page ? 'btn-active' : ''}" 
-            on:click={() => goToPage(p)}
-          >
-            {p}
-          </button>
-        {/each}
-        <button 
-          class="join-item btn" 
-          on:click={() => goToPage(page + 1)}
-          disabled={page >= totalPages}
-        >
-          »
-        </button>
-      </div>
-    {/if}
+    <Pagination {page} {totalPages} onPageChange={goToPage} />
   {/if}
 </div>
 
@@ -498,18 +424,13 @@
           <label class="label" for="key-model">
             <span class="label-text">{$_('apiKeys.modal.modelOptional')}</span>
           </label>
-          <button 
-            type="button" 
-            id="key-model"
-            class="input input-bordered w-full flex items-center cursor-pointer text-left"
-            on:click={openModelDropdown}
-          >
-            {#if newKeyModel}
-              <span>{commonModels.find(m => m.id === newKeyModel)?.name || newKeyModel}</span>
-            {:else}
-              <span class="text-base-content/50">{$_('apiKeys.modal.selectModel')}</span>
-            {/if}
-          </button>
+          <ModelDropdown
+            selectedModel={newKeyModel}
+            placeholder={$_('apiKeys.modal.selectModel')}
+            searchPlaceholder={$_('apiKeys.modal.searchModels')}
+            noModelsFound={$_('apiKeys.modal.noModelsFound')}
+            onSelect={selectModel}
+          />
         </div>
         
         <div class="form-control mb-4">
@@ -569,40 +490,6 @@
           </button>
         {/if}
       </div>
-    </div>
-  </div>
-{/if}
-
-{#if modelDropdownOpen}
-  <div class="fixed inset-0 z-[9999]" on:click={closeModelDropdown}>
-    <div 
-      class="absolute bg-base-100 rounded-box shadow-xl border border-base-300 max-h-80 overflow-y-auto"
-      style="width: {modelDropdownWidth}px; top: {modelDropdownTop}px; left: {modelDropdownLeft}px;"
-      on:click|stopPropagation
-    >
-      <div class="p-2 border-b border-base-300">
-        <input 
-          type="text" 
-          class="input input-sm input-bordered w-full"
-          bind:value={modelSearch}
-          placeholder={$_('apiKeys.modal.searchModels')}
-        />
-      </div>
-      <ul class="menu p-2">
-        {#each filteredModels as model}
-          <li>
-            <button type="button" on:click={() => selectModel(model)}>
-              <div class="flex flex-col items-start">
-                <span class="font-medium">{model.name}</span>
-                <span class="text-xs opacity-60">{model.provider} · {model.id}</span>
-              </div>
-            </button>
-          </li>
-        {/each}
-        {#if filteredModels.length === 0}
-          <li class="menu-disabled"><span>{$_('apiKeys.modal.noModelsFound')}</span></li>
-        {/if}
-      </ul>
     </div>
   </div>
 {/if}

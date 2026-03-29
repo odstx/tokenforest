@@ -19,7 +19,7 @@ pub fn get_jwt_secret() -> &'static [u8] {
     static SECRET: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
     SECRET.get_or_init(|| {
         std::env::var("JWT_SECRET")
-            .unwrap_or_else(|_| "default-secret-key-change-me".to_string())
+            .expect("JWT_SECRET environment variable must be set")
             .into_bytes()
     })
     .as_slice()
