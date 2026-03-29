@@ -370,13 +370,9 @@
                   </button>
                 </div>
                 {#if testResults.has(pool.id)}
-                  <div class="mt-2 text-xs {testResults.get(pool.id)?.success ? 'text-success' : 'text-error'}">
-                    {testResults.get(pool.id)?.message}
-                    {#if testResults.get(pool.id)?.responseContent}
-                      <div class="mt-2 p-2 bg-base-200 rounded text-base-content whitespace-pre-wrap max-h-60 overflow-y-auto">
-                        {testResults.get(pool.id)?.responseContent}
-                      </div>
-                    {/if}
+                  {@const result = testResults.get(pool.id)}
+                  <div class="mt-2 text-xs {result?.success ? 'text-success' : 'text-error'}">
+                    {result?.success ? 'API可用' : result?.message}
                   </div>
                 {/if}
               </td>
