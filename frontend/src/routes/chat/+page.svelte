@@ -233,7 +233,7 @@
 </script>
 
 <div class="flex flex-col h-screen">
-  <div class="flex items-center justify-between p-4 border-b border-base-300">
+  <div class="flex items-center justify-between p-4 border-b border-base-300 shrink-0">
     <div class="flex items-center gap-4">
       <button class="btn btn-sm btn-ghost" on:click={() => goto(resourceType === 'api-key' ? '/api-keys' : '/token-pools')}>
         ← {$_('chat.back')}
@@ -257,7 +257,7 @@
       <span class="loading loading-spinner loading-lg"></span>
     </div>
   {:else}
-    <div class="flex-1 overflow-y-auto p-4" bind:this={messagesContainer}>
+    <div class="flex-1 overflow-y-auto p-4 pb-32 min-h-0" bind:this={messagesContainer}>
       {#if messages.length === 0}
         <div class="flex items-center justify-center h-full">
           <p class="text-base-content/50">{$_('chat.noMessages')}</p>
@@ -291,15 +291,17 @@
     </div>
 
     {#if error}
-      <div class="px-4 pb-2">
-        <div class="alert alert-error">
-          <span>{error}</span>
+      <div class="px-4 pb-2 fixed bottom-[76px] left-0 right-0">
+        <div class="max-w-3xl mx-auto">
+          <div class="alert alert-error">
+            <span>{error}</span>
+          </div>
         </div>
       </div>
     {/if}
 
-    <div class="p-4 border-t border-base-300">
-      <div class="max-w-3xl mx-auto space-y-2">
+    <div class="fixed bottom-0 left-0 right-0 p-4 border-t border-base-300 bg-base-100">
+      <div class="max-w-3xl mx-auto">
         <div class="flex gap-2">
           <textarea
             class="textarea textarea-bordered flex-1 resize-none"
