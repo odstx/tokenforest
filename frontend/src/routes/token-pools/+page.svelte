@@ -48,6 +48,11 @@
 
   function selectModel(model: Model) {
     formData.model_type = model.id;
+    formData.base_url = model.base_url;
+  }
+
+  function handleManualInput(value: string) {
+    formData.model_type = value;
   }
 
   function openActionDropdown(event: MouseEvent, poolId: number) {
@@ -426,6 +431,7 @@
           searchPlaceholder={$_('tokenPools.modal.searchModels')}
           noModelsFound={$_('tokenPools.modal.noModelsFound')}
           onSelect={selectModel}
+          onManualInput={handleManualInput}
         />
       </div>
 

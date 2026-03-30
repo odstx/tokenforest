@@ -7,22 +7,20 @@
   export let searchPlaceholder: string = 'Search models...';
   export let noModelsFound: string = 'No models found';
   export let onSelect: (model: Model) => void = () => {};
+  export let onManualInput: (value: string) => void = () => {};
 
   let isOpen = false;
   let search = '';
   let dropdownTop = 0;
   let dropdownLeft = 0;
   let dropdownWidth = 0;
+  let inputRef: HTMLInputElement | null = null;
 
   $: filteredModels = commonModels.filter(m => 
     m.name.toLowerCase().includes(search.toLowerCase()) ||
     m.id.toLowerCase().includes(search.toLowerCase()) ||
     m.provider.toLowerCase().includes(search.toLowerCase())
   );
-
-  $: selectedModelName = selectedModel 
-    ? commonModels.find(m => m.id === selectedModel)?.name || selectedModel 
-    : null;
 
   function portal(node: HTMLElement) {
     document.body.appendChild(node);
@@ -35,14 +33,14 @@
     };
   }
 
-  function openDropdown(event: MouseEvent) {
-    const target = event.currentTarget as HTMLElement;
-    const rect = target.getBoundingClientRect();
-    dropdownTop = rect.bottom + 4;
-    dropdownLeft = rect.left;
-    dropdownWidth = rect.width;
+  function openDropdown() {
+    if (inputRef) {
+      const rect = inputRef.getBoundingClientRect();
+      dropdownTop = rect.bottom + 4;
+      dropdownLeft = rect.left;
+      dropdownWidth = rect.width;
+    }
     isOpen = true;
-    search = '';
   }
 
   function closeDropdown() {
@@ -52,34 +50,43 @@
 
   function selectModel(model: Model) {
     onSelect(model);
+    search = '';
     closeDropdown();
   }
 
+  function handleFocus() {
+    openDropdown();
+  }
+
+  function handleInput(event: Event) {
+    const value = (event.target as HTMLInputElement).value;
+    if (!isOpen) {
+      openDropdown();
+    }
+    onManualInput(value);
+  }
+
   function handleKeydown(event: KeyboardEvent) {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      isOpen = !isOpen;
-    } else if (event.key === 'Escape') {
+    if (event.key === 'Escape') {
       closeDropdown();
     }
   }
 </script>
 
-<button 
-  type="button" 
-  class="input input-bordered w-full flex items-center cursor-pointer text-left"
-  {id}
-  on:click={openDropdown}
-  on:keydown={handleKeydown}
-  aria-haspopup="listbox"
-  aria-expanded={isOpen}
->
-  {#if selectedModelName}
-    <span>{selectedModelName}</span>
-  {:else}
-    <span class="text-base-content/50">{placeholder}</span>
-  {/if}
-</button>
+<div class="relative">
+  <input 
+    type="text"
+    class="input input-bordered w-full"
+    {id}
+    bind:this={inputRef}
+    bind:value={selectedModel}
+    {placeholder}
+    on:focus={handleFocus}
+    on:input={handleInput}
+    on:keydown={handleKeydown}
+    autocomplete="off"
+  />
+</div>
 
 {#if isOpen}
   <div class="fixed inset-0 z-[9999]" on:click={closeDropdown} role="button" tabindex="-1" use:portal></div>

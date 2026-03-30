@@ -50,6 +50,10 @@
     newKeyModel = model.id;
   }
 
+  function handleManualInput(value: string) {
+    newKeyModel = value;
+  }
+
   function openActionDropdown(event: MouseEvent, keyId: number) {
     const target = event.currentTarget as HTMLElement;
     const rect = target.getBoundingClientRect();
@@ -487,6 +491,7 @@
             searchPlaceholder={$_('apiKeys.modal.searchModels')}
             noModelsFound={$_('apiKeys.modal.noModelsFound')}
             onSelect={selectModel}
+            onManualInput={handleManualInput}
           />
         </div>
         
