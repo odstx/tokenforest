@@ -2,14 +2,17 @@ use axum::{
     routing::{get, post, put},
     Router,
     middleware,
+    http::{header, StatusCode, Uri},
+    response::{IntoResponse, Response},
+    body::Body,
 };
 use sqlx::sqlite::SqlitePool;
 use std::net::SocketAddr;
 use tower_http::cors::{Any, CorsLayer};
-use tower_http::services::ServeDir;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
+use rust_embed::RustEmbed;
 
 mod auth;
 #[allow(dead_code)]
@@ -18,6 +21,45 @@ mod handlers;
 mod models;
 mod db;
 mod crypto;
+
+#[derive(RustEmbed)]
+#[folder = "../frontend/build/"]
+struct FrontendAssets;
+
+async fn static_handler(uri: Uri) -> impl IntoResponse {
+    let mut path = uri.path().trim_start_matches('/').to_string();
+    
+    if path.is_empty() || path == "index.html" {
+        path = "index.html".to_string();
+    }
+    
+    match FrontendAssets::get(&path) {
+        Some(content) => {
+            let mime_type = mime_guess::from_path(&path)
+                .first_or_octet_stream()
+                .as_ref()
+                .to_string();
+            Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, mime_type)
+                .body::<Body>(content.data.into_owned().into())
+                .unwrap()
+        }
+        None => match FrontendAssets::get("index.html") {
+                Some(content) => {
+                    Response::builder()
+                        .status(StatusCode::OK)
+                        .header(header::CONTENT_TYPE, "text/html")
+                        .body::<Body>(content.data.into_owned().into())
+                        .unwrap()
+                }
+                None => Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body::<Body>("Not found".into())
+                    .unwrap(),
+        },
+    }
+}
 
 #[derive(OpenApi)]
 #[openapi(
@@ -143,15 +185,12 @@ async fn main() -> anyhow::Result<()> {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    let frontend_dir = std::env::var("FRONTEND_DIR")
-        .unwrap_or_else(|_| "../frontend/build".to_string());
-    
     let app = Router::new()
         .route("/api/auth/register", post(handlers::register))
         .route("/api/auth/login", post(handlers::login))
         .merge(protected_routes)
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-        .fallback_service(ServeDir::new(&frontend_dir).fallback(ServeDir::new(format!("{}/index.html", frontend_dir))))
+        .fallback(static_handler)
         .layer(cors)
         .with_state(pool);
 

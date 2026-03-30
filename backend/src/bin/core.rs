@@ -2,7 +2,7 @@ use axum::{
     routing::{get, post},
     Router,
     extract::DefaultBodyLimit,
-    http::{StatusCode, header, Method, Uri},
+    http::{StatusCode, header},
     response::IntoResponse,
 };
 use sqlx::sqlite::SqlitePool;
