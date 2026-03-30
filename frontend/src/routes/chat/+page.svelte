@@ -4,6 +4,7 @@
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
   import { _ } from 'svelte-i18n';
+  import { API_BASE_URL } from '$lib/constants';
 
   interface Message {
     role: 'user' | 'assistant';
@@ -21,6 +22,21 @@
   let messages: Message[] = [];
   let messagesContainer: HTMLDivElement;
   let apiKey = '';
+  let baseUrl = '';
+
+  async function fetchConfig() {
+    if (!browser) return;
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/config`);
+      if (response.ok) {
+        const config = await response.json();
+        baseUrl = config.base_url;
+      }
+    } catch {
+      baseUrl = 'http://localhost:8000/v1';
+    }
+  }
 
   async function fetchResourceInfo() {
     if (!browser) return;
@@ -149,7 +165,12 @@
   }
 
   async function sendApiKeyMessage(_userMessage: string) {
-    const response = await fetch('http://localhost:8000/v1/chat/completions', {
+    if (!baseUrl) {
+      error = 'Configuration not loaded';
+      return;
+    }
+
+    const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -229,7 +250,10 @@
     error = null;
   }
 
-  onMount(fetchResourceInfo);
+  onMount(() => {
+    fetchConfig();
+    fetchResourceInfo();
+  });
 </script>
 
 <div class="flex flex-col h-screen">

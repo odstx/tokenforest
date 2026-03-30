@@ -4,11 +4,13 @@ use utoipa::ToSchema;
 
 pub mod api_keys;
 pub mod auth;
+pub mod config;
 pub mod stats;
 pub mod token_pools;
 
 pub use api_keys::*;
 pub use auth::*;
+pub use config::*;
 pub use stats::*;
 pub use token_pools::*;
 

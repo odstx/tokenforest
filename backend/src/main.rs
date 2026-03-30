@@ -188,6 +188,7 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/api/auth/register", post(handlers::register))
         .route("/api/auth/login", post(handlers::login))
+        .route("/api/config", get(handlers::get_config))
         .merge(protected_routes)
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .fallback(static_handler)
